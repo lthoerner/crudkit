@@ -1,0 +1,8 @@
+[package]
+name = "crudkit"
+version = "0.0.0"
+edition = "2021"
+description = "This is a placeholder crate for a project I am planning on creating. If I do not get around to it, I will happily relinquish this crate name to whoever will actually use it. Contact me via contact@lthoerner.com if you would like to claim this crate."
+license = "MIT OR Apache-2.0"
+
+[dependencies]
