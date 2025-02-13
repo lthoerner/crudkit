@@ -1,4 +1,4 @@
-use rand::{thread_rng, Rng};
+use rand::{rng, Rng};
 use sqlx::postgres::PgRow;
 
 /// A trait that allows table and view types to interoperate with and be queried from the database.
@@ -50,7 +50,7 @@ pub trait Relation: Sized {
     /// needed.
     fn pick_random(&self) -> Self::Record {
         let records = self.records();
-        records[thread_rng().gen_range(0..records.len())].clone()
+        records[rng().random_range(0..records.len())].clone()
     }
 }
 
