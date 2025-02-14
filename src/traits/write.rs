@@ -30,7 +30,6 @@ pub trait WriteRelation: Relation {
     /// issues, but the type it refers to must be the same.
     type WriteRecord: WriteRecord<WriteRelation = Self>;
 
-    #[allow(dead_code)]
     /// Create a single record in the database.
     ///
     /// In the future, this will return a proper status code. At the moment, it does not return
@@ -64,7 +63,6 @@ pub trait WriteRelation: Relation {
         }
     }
 
-    #[allow(dead_code)]
     fn update_one(
         _database: &PgDatabase,
         _update_params: <Self::WriteRecord as WriteRecord>::UpdateQueryParameters,
@@ -72,7 +70,6 @@ pub trait WriteRelation: Relation {
         async { todo!() }
     }
 
-    #[allow(dead_code)]
     fn update_one_handler<S: DatabaseState>(
         state: State<Arc<S>>,
         Query(update_params): Query<<Self::WriteRecord as WriteRecord>::UpdateQueryParameters>,
@@ -120,7 +117,6 @@ pub trait WriteRelation: Relation {
         async move { Json(Self::delete_one(&state.get_database(), id_param).await) }
     }
 
-    #[allow(dead_code)]
     /// Delete all records for this relation from the database.
     ///
     /// If the records are successfully deleted from the database, this method returns `true`. If an
@@ -141,7 +137,6 @@ pub trait WriteRelation: Relation {
         }
     }
 
-    #[allow(dead_code)]
     /// Delete all records for this relation from the database.
     ///
     /// If the records are successfully deleted from the database, this method returns `true`. If an
