@@ -1,6 +1,11 @@
 use rand::{rng, Rng};
 use sqlx::postgres::PgRow;
 
+#[cfg(doc)]
+use super::read::{ReadRecord, ReadRelation};
+#[cfg(doc)]
+use super::write::{WriteRecord, WriteRelation};
+
 /// A trait that allows table and view types to interoperate with and be queried from the database.
 ///
 /// This trait does not do a lot on its own but it, along with [`Record`], provides the

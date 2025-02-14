@@ -8,6 +8,8 @@ use sqlx::Postgres;
 
 use super::id_parameter::IdParameter;
 use super::shared::{Record, Relation};
+#[cfg(doc)]
+use super::read::ReadRecord;
 use crate::database::{DatabaseState, PgDatabase, SQL_PARAMETER_BIND_LIMIT};
 
 /// A trait that enables writable tables to have their records modified in the database.
@@ -158,9 +160,7 @@ pub trait WriteRelation: Relation {
 /// record types, both traits can be implemented safely.
 ///
 /// This trait gets most of the information it needs to function from the upstream [`Relation`]
-/// trait, using the associated type [`Record::Relation`]. It also depends on [`SingleInsert`] to
-/// create items in the database when a call is made to [`WriteRecord::create_one()`] or
-/// [`WriteRecord::create_one_handler()`].
+/// trait, using the associated type [`Record::Relation`].
 ///
 /// Also see [`WriteRelation`].
 pub trait WriteRecord: Record<Relation: WriteRelation> + SingleInsert {

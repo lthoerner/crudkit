@@ -5,6 +5,8 @@ use axum::extract::{Json, Query, State};
 
 use super::id_parameter::IdParameter;
 use super::shared::{Record, Relation};
+#[cfg(doc)]
+use super::write::{WriteRecord, WriteRelation};
 use crate::database::{DatabaseState, PgDatabase};
 
 /// A trait that enables readable tables and views to have their records queried from the database.
