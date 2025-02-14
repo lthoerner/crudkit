@@ -5,8 +5,7 @@ use axum::extract::{Json, Query, State};
 
 use super::id_parameter::IdParameter;
 use super::shared::{Record, Relation};
-use crate::database::Database;
-use crate::server_state::ServerState;
+use crate::database::{DatabaseState, PgDatabase};
 
 /// A trait that enables readable tables and views to have their records queried from the database.
 ///
@@ -34,7 +33,7 @@ pub trait ReadRelation: Relation {
     /// This is the standard version of this method and should not be used as an Axum route handler.
     /// For the handler method, use [`ReadRelation::query_one_handler()`].
     fn query_one<I: IdParameter>(
-        database: &Database,
+        database: &PgDatabase,
         id: I,
     ) -> impl Future<Output = Option<Self::ReadRecord>> {
         async move {
@@ -58,18 +57,18 @@ pub trait ReadRelation: Relation {
     /// This is the Axum route handler version of this method. For the standard method, which can be
     /// called outside of an Axum context, see [`ReadRelation::query_one()`].
     // TODO: Check how this interacts with junction tables
-    fn query_one_handler<I: IdParameter>(
-        state: State<Arc<ServerState>>,
+    fn query_one_handler<I: IdParameter, S: DatabaseState>(
+        state: State<Arc<S>>,
         Query(id_param): Query<I>,
     ) -> impl Future<Output = Json<Option<Self::ReadRecord>>> {
-        async move { Json(Self::query_one(&state.database, id_param).await) }
+        async move { Json(Self::query_one(&state.get_database(), id_param).await) }
     }
 
     /// Query (select) all records for this relation from the database.
     ///
     /// This is the standard version of this method and should not be used as an Axum route handler.
     /// For the handler method, use [`ReadRelation::query_all_handler()`].
-    fn query_all(database: &Database) -> impl Future<Output = Self> {
+    fn query_all(database: &PgDatabase) -> impl Future<Output = Self> {
         async move {
             Self::with_records(
                 sqlx::query_as(&format!(
@@ -89,8 +88,10 @@ pub trait ReadRelation: Relation {
     ///
     /// This is the Axum route handler version of this method. For the standard method, which can be
     /// called outside of an Axum context, see [`ReadRelation::query_all()`].
-    fn query_all_handler(state: State<Arc<ServerState>>) -> impl Future<Output = Json<Self>> {
-        async move { Json(Self::query_all(&state.database).await) }
+    fn query_all_handler<S: DatabaseState>(
+        state: State<Arc<S>>,
+    ) -> impl Future<Output = Json<Self>> {
+        async move { Json(Self::query_all(&state.get_database()).await) }
     }
 }
 
