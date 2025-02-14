@@ -1,3 +1,4 @@
+use std::future::Future;
 use std::sync::Arc;
 
 use axum::extract::{Json, Query, State};
@@ -32,17 +33,22 @@ pub trait ReadRelation: Relation {
     ///
     /// This is the standard version of this method and should not be used as an Axum route handler.
     /// For the handler method, use [`ReadRelation::query_one_handler()`].
-    async fn query_one<I: IdParameter>(database: &Database, id: I) -> Option<Self::ReadRecord> {
-        sqlx::query_as(&format!(
-            "SELECT * FROM {}.{} WHERE {} = #1",
-            Self::SCHEMA_NAME,
-            Self::RELATION_NAME,
-            Self::PRIMARY_KEY,
-        ))
-        .bind(id.id() as i32)
-        .fetch_one(&database.connection)
-        .await
-        .ok()
+    fn query_one<I: IdParameter>(
+        database: &Database,
+        id: I,
+    ) -> impl Future<Output = Option<Self::ReadRecord>> {
+        async move {
+            sqlx::query_as(&format!(
+                "SELECT * FROM {}.{} WHERE {} = #1",
+                Self::SCHEMA_NAME,
+                Self::RELATION_NAME,
+                Self::PRIMARY_KEY,
+            ))
+            .bind(id.id() as i32)
+            .fetch_one(&database.connection)
+            .await
+            .ok()
+        }
     }
 
     /// Query (select) a single record from the database using an identifying key.
@@ -52,37 +58,39 @@ pub trait ReadRelation: Relation {
     /// This is the Axum route handler version of this method. For the standard method, which can be
     /// called outside of an Axum context, see [`ReadRelation::query_one()`].
     // TODO: Check how this interacts with junction tables
-    async fn query_one_handler<I: IdParameter>(
+    fn query_one_handler<I: IdParameter>(
         state: State<Arc<ServerState>>,
         Query(id_param): Query<I>,
-    ) -> Json<Option<Self::ReadRecord>> {
-        Json(Self::query_one(&state.database, id_param).await)
+    ) -> impl Future<Output = Json<Option<Self::ReadRecord>>> {
+        async move { Json(Self::query_one(&state.database, id_param).await) }
     }
 
     /// Query (select) all records for this relation from the database.
     ///
     /// This is the standard version of this method and should not be used as an Axum route handler.
     /// For the handler method, use [`ReadRelation::query_all_handler()`].
-    async fn query_all(database: &Database) -> Self {
-        Self::with_records(
-            sqlx::query_as(&format!(
-                "SELECT * FROM {}.{} ORDER BY {}",
-                Self::SCHEMA_NAME,
-                Self::RELATION_NAME,
-                Self::PRIMARY_KEY,
-            ))
-            .fetch_all(&database.connection)
-            .await
-            .unwrap(),
-        )
+    fn query_all(database: &Database) -> impl Future<Output = Self> {
+        async move {
+            Self::with_records(
+                sqlx::query_as(&format!(
+                    "SELECT * FROM {}.{} ORDER BY {}",
+                    Self::SCHEMA_NAME,
+                    Self::RELATION_NAME,
+                    Self::PRIMARY_KEY,
+                ))
+                .fetch_all(&database.connection)
+                .await
+                .unwrap(),
+            )
+        }
     }
 
     /// Query (select) all records for this relation from the database.
     ///
     /// This is the Axum route handler version of this method. For the standard method, which can be
     /// called outside of an Axum context, see [`ReadRelation::query_all()`].
-    async fn query_all_handler(state: State<Arc<ServerState>>) -> Json<Self> {
-        Json(Self::query_all(&state.database).await)
+    fn query_all_handler(state: State<Arc<ServerState>>) -> impl Future<Output = Json<Self>> {
+        async move { Json(Self::query_all(&state.database).await) }
     }
 }
 

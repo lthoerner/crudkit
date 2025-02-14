@@ -1,3 +1,4 @@
+use std::future::Future;
 use std::sync::Arc;
 
 use axum::extract::{Json, Query, State};
@@ -39,11 +40,11 @@ pub trait WriteRelation: Relation {
     ///
     /// This is the standard version of this method and should not be used as an Axum route handler.
     /// For the handler method, use [`WriteRelation::create_one_handler()`].
-    async fn create_one(
+    fn create_one(
         database: &Database,
         create_params: <Self::WriteRecord as WriteRecord>::CreateQueryParameters,
-    ) {
-        create_params.into().insert(database).await
+    ) -> impl Future<Output = ()> {
+        async { create_params.into().insert(database).await }
     }
 
     /// Create a single record in the database.
@@ -54,29 +55,33 @@ pub trait WriteRelation: Relation {
     ///
     /// This is the Axum route handler version of this method. For the standard method, which can be
     /// called outside of an Axum context, see [`WriteRelation::create_one()`].
-    async fn create_one_handler(
+    fn create_one_handler(
         state: State<Arc<ServerState>>,
         Query(create_params): Query<<Self::WriteRecord as WriteRecord>::CreateQueryParameters>,
-    ) -> StatusCode {
-        Self::create_one(&state.database, create_params).await;
-        StatusCode::CREATED
+    ) -> impl Future<Output = StatusCode> {
+        async move {
+            Self::create_one(&state.database, create_params).await;
+            StatusCode::CREATED
+        }
     }
 
     #[allow(dead_code)]
-    async fn update_one(
+    fn update_one(
         _database: &Database,
         _update_params: <Self::WriteRecord as WriteRecord>::UpdateQueryParameters,
-    ) {
-        todo!()
+    ) -> impl Future<Output = ()> {
+        async { todo!() }
     }
 
     #[allow(dead_code)]
-    async fn update_one_handler(
+    fn update_one_handler(
         state: State<Arc<ServerState>>,
         Query(update_params): Query<<Self::WriteRecord as WriteRecord>::UpdateQueryParameters>,
-    ) -> StatusCode {
-        Self::update_one(&state.database, update_params).await;
-        StatusCode::OK
+    ) -> impl Future<Output = StatusCode> {
+        async move {
+            Self::update_one(&state.database, update_params).await;
+            StatusCode::OK
+        }
     }
 
     /// Delete a single record from the database using an identifying key.
@@ -87,17 +92,19 @@ pub trait WriteRelation: Relation {
     /// This is the standard version of this method and should not be used as an Axum route handler.
     /// For the handler method, use [`WriteRelation::delete_one_handler()`].
     // TODO: Return a more useful value for error handling
-    async fn delete_one<I: IdParameter>(database: &Database, id: I) -> bool {
-        sqlx::query(&format!(
-            "DELETE FROM {}.{} WHERE {} = $1",
-            Self::SCHEMA_NAME,
-            Self::RELATION_NAME,
-            Self::PRIMARY_KEY,
-        ))
-        .bind(id.id() as i32)
-        .execute(&database.connection)
-        .await
-        .is_ok()
+    fn delete_one<I: IdParameter>(database: &Database, id: I) -> impl Future<Output = bool> {
+        async move {
+            sqlx::query(&format!(
+                "DELETE FROM {}.{} WHERE {} = $1",
+                Self::SCHEMA_NAME,
+                Self::RELATION_NAME,
+                Self::PRIMARY_KEY,
+            ))
+            .bind(id.id() as i32)
+            .execute(&database.connection)
+            .await
+            .is_ok()
+        }
     }
 
     /// Delete a single record from the database using an identifying key.
@@ -107,11 +114,11 @@ pub trait WriteRelation: Relation {
     ///
     /// This is the Axum route handler version of this method. For the standard method, which can be
     /// called outside of an Axum context, see [`WriteRelation::delete_one()`].
-    async fn delete_one_handler<I: IdParameter>(
+    fn delete_one_handler<I: IdParameter>(
         state: State<Arc<ServerState>>,
         Query(id_param): Query<I>,
-    ) -> Json<bool> {
-        Json(Self::delete_one(&state.database, id_param).await)
+    ) -> impl Future<Output = Json<bool>> {
+        async move { Json(Self::delete_one(&state.database, id_param).await) }
     }
 
     #[allow(dead_code)]
@@ -122,15 +129,17 @@ pub trait WriteRelation: Relation {
     ///
     /// This is the standard version of this method and should not be used as an Axum route handler.
     /// For the handler method, use [`WriteRelation::delete_all_handler()`].
-    async fn delete_all(database: &Database) -> bool {
-        sqlx::query(&format!(
-            "DELETE FROM {}.{}",
-            Self::SCHEMA_NAME,
-            Self::RELATION_NAME,
-        ))
-        .execute(&database.connection)
-        .await
-        .is_ok()
+    fn delete_all(database: &Database) -> impl Future<Output = bool> {
+        async move {
+            sqlx::query(&format!(
+                "DELETE FROM {}.{}",
+                Self::SCHEMA_NAME,
+                Self::RELATION_NAME,
+            ))
+            .execute(&database.connection)
+            .await
+            .is_ok()
+        }
     }
 
     #[allow(dead_code)]
@@ -141,8 +150,8 @@ pub trait WriteRelation: Relation {
     ///
     /// This is the Axum route handler version of this method. For the standard method, which can be
     /// called outside of an Axum context, see [`WriteRelation::delete_all()`].
-    async fn delete_all_handler(state: State<Arc<ServerState>>) -> Json<bool> {
-        Json(Self::delete_all(&state.database).await)
+    fn delete_all_handler(state: State<Arc<ServerState>>) -> impl Future<Output = Json<bool>> {
+        async move { Json(Self::delete_all(&state.database).await) }
     }
 }
 
@@ -212,10 +221,12 @@ pub trait SingleInsert: Record {
     /// This should not be used repeatedly for a collection of records. Inserting multiple records
     /// can be done much more efficiently using [`BulkInsert::insert_all`], which should be
     /// implemented for any database table type.
-    async fn insert(self, database: &Database) {
-        let mut query_builder = Self::get_query_builder();
-        query_builder.push_values(std::iter::once(self), Self::push_column_bindings);
-        database.execute_query_builder(query_builder).await;
+    fn insert(self, database: &Database) -> impl Future<Output = ()> {
+        async move {
+            let mut query_builder = Self::get_query_builder();
+            query_builder.push_values(std::iter::once(self), Self::push_column_bindings);
+            database.execute_query_builder(query_builder).await;
+        }
     }
 }
 
@@ -252,11 +263,13 @@ pub trait BulkInsert: WriteRelation<Record: SingleInsert> {
     ///
     /// This can insert tables of arbitrary size, but each batch is limited in size by number of
     /// parameters (table column count * record count).
-    async fn insert_all(self, database: &Database) {
-        for chunk in self.into_chunks() {
-            let mut query_builder = Self::Record::get_query_builder();
-            query_builder.push_values(chunk, Self::Record::push_column_bindings);
-            database.execute_query_builder(query_builder).await;
+    fn insert_all(self, database: &Database) -> impl Future<Output = ()> {
+        async move {
+            for chunk in self.into_chunks() {
+                let mut query_builder = Self::Record::get_query_builder();
+                query_builder.push_values(chunk, Self::Record::push_column_bindings);
+                database.execute_query_builder(query_builder).await;
+            }
         }
     }
 }
