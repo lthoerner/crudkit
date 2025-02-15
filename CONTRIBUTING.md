@@ -77,7 +77,27 @@ complexity. We will try our best to make sure that issues are marked with "expec
 so that contributors like you can easily jump in and find something to work on.
 
 ## Code Conventions \& Quality
-> *To be expanded upon later.*
+Generally speaking, the code that you contribute should roughly match the style of the code around
+it. This is not a strict rule by any means, and most of the time maintainers will provide minor
+revisions when code is submitted in a PR.
+
+Here are some general guidelines:
+- All modules should use the `mod.rs` module root format.
+- Module declarations should be placed at the top of a file, above all imports.
+- Import paths should be fully clarified and should not rely on any more than a single layer of
+re-exports.
+- Imports should not be nested.
+- Imports should be separated into three sections: standard library imports, external crate imports,
+and internal imports.
+- Internal imports should use the full `crate::` path if more than one `super::` would be needed.
+- Re-exports should not be used internally.
+- File-wide attributes such as `#![allow(...)]` should not be used.
+- Functions should not exceed a few dozen lines when avoidable.
+- Variables and type names should not be abbreviated in any way, except in the case of universal
+conventions such as iterator variables and single-letter generic type parameter names.
+- Comments should use proper grammar and syntax.
+- Comments should not be used excessively, but should be descriptive and thorough when necessary.
+- All public-facing items should be documented using doc comments.
 
 ## Editor Setup
 > *To be expanded upon later.*
