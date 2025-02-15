@@ -100,10 +100,34 @@ conventions such as iterator variables and single-letter generic type parameter 
 - All public-facing items should be documented using doc comments.
 
 ## Editor Setup
-> *To be expanded upon later.*
+It is highly recommended that you use Visual Studio Code to work on this project. If you wish to use
+another editor you are absolutely welcome to, but we do not officially support any other editors in
+terms of publishing setup guides or scripts.
+
+Though the aesthetic customization of your editor is entirely up to you, there are some extensions
+and settings that we suggest you use. These are detailed below.
 
 ### Extensions
-> *To be expanded upon later.*
+#### Language Support Tools
+- [rust-analyzer](https://marketplace.visualstudio.com/items?itemName=rust-lang.rust-analyzer): adds
+Rust LSP support
+- [Even Better TOML](https://marketplace.visualstudio.com/items?itemName=tamasfe.even-better-toml):
+adds TOML LSP support
+- [Rust Syntax](https://marketplace.visualstudio.com/items?itemName=dustypomerleau.rust-syntax):
+improves syntax highlighting for Rust
+#### Formatting Tools
+- [Reflow Markdown](https://marketplace.visualstudio.com/items?itemName=marvhen.reflow-markdown):
+automatically reflows Markdown file contents to fit a specified width
+#### Visualization Tools
+- [Error Lens](https://marketplace.visualstudio.com/items?itemName=usernamehw.errorlens): displays
+errors inline rather than having to hover over them with a cursor or use `cargo check`
+- [Better Comments](https://marketplace.visualstudio.com/items?itemName=aaron-bond.better-comments):
+adds color highlighting for comments that can visually indicate the purpose of the comment more
+conveniently
+#### Collaboration Tools
+-
+  [GitHub Pull Requests](https://marketplace.visualstudio.com/items?itemName=GitHub.vscode-pull-request-github):
+  adds a pull request browser sidebar for managing your own and others' pull requests
 
 ### Settings
 > *To be expanded upon later.*
@@ -184,6 +208,11 @@ appropriate development branch. We generally prefer to use rebase rather than me
 an easily-navigable linear history. If this eventually becomes untenable we may switch to using
 merges. Colloquially, we use the term "merge" to mean "merge or rebase," so don't worry about the
 nomenclature.
+
+#### Ignored Files
+Please do not commit your `.vscode` directory or any other editor, extension, or tool configuration
+to the Git repository. Do not edit the `.gitignore` unless there is a compelling reason to do so.
+Instead, use `.git/info/exclude` for a local-only blacklist.
 
 ### Testing Workflows
 At the moment we do not have any testing workflows, but this will change in the near future.
