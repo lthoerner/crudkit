@@ -76,16 +76,6 @@ In the process of developing this project, there will inevitably arise issues of
 complexity. We will try our best to make sure that issues are marked with "expected difficulty" tags
 so that contributors like you can easily jump in and find something to work on.
 
-## Code of Conduct
-Please be aware that the maintainers and other developers of this project are people too, with their
-own lives, responsibilities, and circumstances. Just like in most open-source development, this is
-volunteer work, and contributors should not be holding each other to the same standards they would
-expect of a coworker in terms of productivity. However, all contributors (including maintainers) are
-expected to follow the same general rules of etiquette that would be found in the average workplace.
-Toxicity will absolutely not be tolerated from anyone, regardless of the magnitude of their
-contribution. On a personal note, I expect you to hold me to this standard, and if I do not live up
-to it, it is well within your right under the license of this software to create a fork.
-
 ## Code Conventions \& Quality
 > *To be expanded upon later.*
 
