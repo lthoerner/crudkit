@@ -5,7 +5,7 @@ use axum::extract::{Json, Query, State};
 
 use super::id_parameter::IdParameter;
 use super::shared::{Record, Relation};
-#[cfg(doc)]
+#[allow(unused_imports)]
 use super::write::{WriteRecord, WriteRelation};
 use crate::database::{DatabaseState, PgDatabase};
 

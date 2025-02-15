@@ -7,9 +7,9 @@ use sqlx::query_builder::{QueryBuilder, Separated};
 use sqlx::Postgres;
 
 use super::id_parameter::IdParameter;
-use super::shared::{Record, Relation};
-#[cfg(doc)]
+#[allow(unused_imports)]
 use super::read::ReadRecord;
+use super::shared::{Record, Relation};
 use crate::database::{DatabaseState, PgDatabase, SQL_PARAMETER_BIND_LIMIT};
 
 /// A trait that enables writable tables to have their records modified in the database.

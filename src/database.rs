@@ -1,8 +1,8 @@
 use sqlx::{query_builder::QueryBuilder, Postgres};
 
-#[cfg(doc)]
+#[allow(unused_imports)]
 use crate::traits::read::ReadRelation;
-#[cfg(doc)]
+#[allow(unused_imports)]
 use crate::traits::write::WriteRelation;
 
 pub const SQL_PARAMETER_BIND_LIMIT: usize = u16::MAX as usize;
