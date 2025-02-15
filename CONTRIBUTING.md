@@ -81,7 +81,7 @@ Generally speaking, the code that you contribute should roughly match the style 
 it. This is not a strict rule by any means, and most of the time maintainers will provide minor
 revisions when code is submitted in a PR.
 
-Here are some general guidelines:
+### Guidelines
 - All modules should use the `mod.rs` module root format.
 - Module declarations should be placed at the top of a file, above all imports.
 - Import paths should be fully clarified and should not rely on any more than a single layer of
@@ -108,11 +108,79 @@ conventions such as iterator variables and single-letter generic type parameter 
 ### Settings
 > *To be expanded upon later.*
 
-## Commit Etiquette
-> *To be expanded upon later.*
+## Collaboration
 
-## Pull Requests
-> *To be expanded upon later.*
+### Commit Etiquette
+CRUDkit uses a simplified version of the
+["Conventional Commits"](https://www.conventionalcommits.org/en/v1.0.0/) format. Please ensure that
+your commits include a commit message. At the moment, we do not feel the project codebase is large
+enough to include scope qualifiers in the messages. Try to avoid using commit types other than
+`feat`, `fix`, or `refactor`. Once an initial release has been published, we will require the `!`
+breaking change specifier to be added to messages, as in `feat!`.
 
-## Testing Workflows
-> *To be expanded upon later.*
+Do note that if your commits do not have messages or are improperly formatted, they will be edited
+by maintainers, which can cause issues when you try to sync your local Git repository with the
+upstream. If your commits do not have messages and their purpose is not easily discernible from the
+diff, a maintainer will ask you for more information.
+
+Commits should not be extraordinarily large. There are some exceptions to this, such as when moving
+large codeblocks between files, where there will be many lines changed but minimal real changes to
+the codebase. Extremely small commits are completely fine, but we recommend that you commit at the
+point where you feel like you can write a meaningful commit message. If you are just trying to keep
+a thorough history while you work on a feature, you can make commits with no messages in your fork
+and then squash them into one larger commit with a message later.
+
+### Issues
+Issues are the main way of discussing bugs, feature requests, and other ideas regarding the project.
+We do not use GitHub's "Discussions" feature because it is too similar in usage to Issues.
+
+#### Writing Issues
+Please be thorough when writing an issue. Use proper syntax and grammar. If you are not a native
+English speaker, there are a lot of tools that can help revise your writing, but it is not a major
+problem if your issue has some improper or odd phrasing. All we require is that you make your best
+effort, and maintainers will ask for clarification if necessary.
+
+If the issue you are writing pertains to a bug, please try your best to find a way to reproduce it
+and give examples of how others could encounter the bug. If the issue pertains to an idea or feature
+request, please try to give some examples of how you think the feature could be used, preferably
+including a few code snippets demonstrating how the user-facing API might work.
+
+#### Duplicate Issues
+We request that you look for similar issues prior to opening a new one, but if it appears that an
+issue has been abandoned, you may open a new issue so long as it mentions the original issue(s),
+preferably with links. If it is deemed that your issue is a duplicate, a maintainer will comment on
+it with information about what other issue(s) they believe it is a duplicate of. There will be a
+two-day period for you to respond, either to confirm that it is a duplicate, or to dispute it and
+clarify the issue as needed. If you do not respond within this time, the issue will be marked as a
+duplicate and archived.
+
+### Pull Requests
+Pull requests (PRs) are the main way to contribute to CRUDkit, and indeed essentially any
+open-source project. The way we do PRs is very typical, so if you are an experienced open-source
+developer you should feel right at home.
+
+#### Guidelines
+- An issue should be filed prior to making a PR. This is not for the maintainers' sake but for your
+own. Filing an issue will ensure that your contribution is not a duplicate and does not conflict
+with other in-progress contributions, so that you do not waste time doing a bunch of work only to
+find out someone else is working on it already, or that it does not fit into the project's design.
+- For contributions which are approved via an issue but still being worked on, draft PRs should be
+used until the contribution is ready for review.
+- Once a PR is submitted and ready for review, you may message the maintainers either through a
+mention in the comments of the PR or through Discord. It should go without mentioning that you are
+not to spam or harass anyone in this process.
+- Keep up-to-date with your own PR and be responsive with maintainers and other contributors as they
+make suggestions or edits. If you do not respond for some time, maintainers may make the edits and
+merge the PR without further consulting you.
+
+#### Merging/Rebasing
+When a PR has been reviewed and is deemed ready to merge, we will merge it into `main` or an
+appropriate development branch. We generally prefer to use rebase rather than merge in order to keep
+an easily-navigable linear history. If this eventually becomes untenable we may switch to using
+merges. Colloquially, we use the term "merge" to mean "merge or rebase," so don't worry about the
+nomenclature.
+
+### Testing Workflows
+At the moment we do not have any testing workflows, but this will change in the near future.
+Specifically, we will be setting up regression tests using Cargo's built-in testing framework and we
+will request that contributors ensure their code passes the test suite before publishing a final PR.
