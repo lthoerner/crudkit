@@ -111,6 +111,7 @@ conventions such as iterator variables and single-letter generic type parameter 
 ## Collaboration
 
 ### Commit Etiquette
+#### Commit Messages
 CRUDkit uses a simplified version of the
 ["Conventional Commits"](https://www.conventionalcommits.org/en/v1.0.0/) format. Please ensure that
 your commits include a commit message. At the moment, we do not feel the project codebase is large
@@ -123,6 +124,10 @@ by maintainers, which can cause issues when you try to sync your local Git repos
 upstream. If your commits do not have messages and their purpose is not easily discernible from the
 diff, a maintainer will ask you for more information.
 
+Commit should not include a description. If a commit is complex enough to warrant a description, it
+is likely too large and should be split up into separate commits.
+
+#### Commit Frequency
 Commits should not be extraordinarily large. There are some exceptions to this, such as when moving
 large codeblocks between files, where there will be many lines changed but minimal real changes to
 the codebase. Extremely small commits are completely fine, but we recommend that you commit at the
