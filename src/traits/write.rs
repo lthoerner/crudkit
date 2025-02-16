@@ -8,7 +8,7 @@ use sqlx::Postgres;
 
 use super::id_parameter::IdParameter;
 #[allow(unused_imports)]
-use super::read::ReadRecord;
+use super::read::{ReadRecord, ReadRelation};
 use super::shared::{Record, Relation};
 use crate::database::{DatabaseState, PgDatabase, SQL_PARAMETER_BIND_LIMIT};
 
