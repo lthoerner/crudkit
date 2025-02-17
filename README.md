@@ -1,3 +1,5 @@
+> *Written by Lowell Thoerner*
+
 # CRUDkit
 CRUDkit is a Rust crate that aims to provide a convenient framework to build CRUD application
 backends using Axum and PostgreSQL, acting as an abstraction over SQLX. In the future, it will
