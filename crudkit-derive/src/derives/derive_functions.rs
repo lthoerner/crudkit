@@ -109,7 +109,7 @@ pub fn derive_relation(input: TokenStream) -> TokenStream {
     });
 
     quote! {
-        impl crate::database::traits::shared::Relation for #type_name {
+        impl crudkit::traits::shared::Relation for #type_name {
             type Record = #record_type_name;
             #optional_schema_definition
             const RELATION_NAME: &str = #relation_name;
@@ -147,7 +147,7 @@ pub fn derive_read_relation(input: TokenStream) -> TokenStream {
     };
 
     quote! {
-        impl crate::database::traits::read::ReadRelation for #type_name {
+        impl crudkit::traits::read::ReadRelation for #type_name {
             type ReadRecord = #record_type_name;
         }
     }
@@ -171,7 +171,7 @@ pub fn derive_write_relation(input: TokenStream) -> TokenStream {
     };
 
     quote! {
-        impl crate::database::traits::write::WriteRelation for #type_name {
+        impl crudkit::traits::write::WriteRelation for #type_name {
             type WriteRecord = #record_type_name;
         }
     }
@@ -215,7 +215,7 @@ pub fn derive_record(input: TokenStream) -> TokenStream {
     }
 
     quote! {
-        impl crate::database::traits::shared::Record for #type_name {
+        impl crudkit::traits::shared::Record for #type_name {
             const COLUMN_NAMES: &[&str] = &[#(#column_names),*];
 
             type Relation = #relation_type_name;
@@ -241,7 +241,7 @@ pub fn derive_read_record(input: TokenStream) -> TokenStream {
     };
 
     quote! {
-        impl crate::database::traits::read::ReadRecord for #type_name {
+        impl crudkit::traits::read::ReadRecord for #type_name {
             type ReadRelation = #relation_type_name;
         }
     }
@@ -430,7 +430,7 @@ pub fn derive_write_record(input: TokenStream) -> TokenStream {
             where_clause,
         );
 
-        use crate::database::traits::Relation;
+        use crudkit::traits::shared::Relation;
         let mut query = sqlx::query(&query_string);
 
         if let Some(name) = name {
@@ -481,7 +481,7 @@ pub fn derive_write_record(input: TokenStream) -> TokenStream {
             }
         }
 
-        impl crate::database::traits::write::WriteRecord for #type_name {
+        impl crudkit::traits::write::WriteRecord for #type_name {
             type WriteRelation = #relation_type_name;
             type CreateQueryParameters = #create_params_type_name;
             type UpdateQueryParameters = #update_params_type_name;
@@ -561,9 +561,9 @@ pub fn derive_single_insert(input: TokenStream) -> TokenStream {
     }
 
     quote! {
-        impl crate::database::traits::write::SingleInsert for #type_name {
+        impl crudkit::traits::write::SingleInsert for #type_name {
             fn push_column_bindings(
-                mut builder: sqlx::query_builder::Separated<crate::database::Postgres, &str>,
+                mut builder: sqlx::query_builder::Separated<sqlx::Postgres, &str>,
                 record: Self,
             ) {
                 #(
@@ -586,7 +586,7 @@ pub fn derive_bulk_insert(input: TokenStream) -> TokenStream {
     };
 
     quote! {
-        impl crate::database::traits::write::BulkInsert for #type_name {}
+        impl crudkit::traits::write::BulkInsert for #type_name {}
     }
     .into()
 }
