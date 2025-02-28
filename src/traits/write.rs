@@ -66,10 +66,10 @@ pub trait WriteRelation: Relation {
     }
 
     fn update_one(
-        _database: &PgDatabase,
-        _update_params: <Self::WriteRecord as WriteRecord>::UpdateQueryParameters,
+        database: &PgDatabase,
+        update_params: <Self::WriteRecord as WriteRecord>::UpdateQueryParameters,
     ) -> impl Future<Output = ()> {
-        async { todo!() }
+        <Self::WriteRecord as WriteRecord>::update_one(database, update_params)
     }
 
     fn update_one_handler<S: DatabaseState>(
@@ -183,6 +183,11 @@ pub trait WriteRecord: Record<Relation: WriteRelation> + SingleInsert {
     /// includes all of the table's columns as optional fields except ID fields that must be
     /// specified for the database to determine which record to update.
     type UpdateQueryParameters;
+
+    fn update_one(
+        database: &PgDatabase,
+        update_params: Self::UpdateQueryParameters,
+    ) -> impl Future<Output = ()>;
 }
 
 /// A trait that allows a single record to be inserted to the database.
