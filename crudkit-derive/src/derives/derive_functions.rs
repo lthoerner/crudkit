@@ -1,5 +1,4 @@
 use deluxe::ExtractAttributes;
-use proc_macro::TokenStream;
 use proc_macro2::TokenStream as TokenStream2;
 use quote::quote;
 use syn::{
@@ -35,7 +34,7 @@ enum PrimaryKeyAttribute {
     None,
 }
 
-pub fn derive_id_parameter(input: TokenStream) -> SynResult<TokenStream> {
+pub fn derive_id_parameter(input: TokenStream2) -> SynResult<TokenStream2> {
     let (type_name, type_data) = parse_type_ident_and_data(input)?;
     let (_, unparsed_type_fields) =
         get_struct_data_and_unparsed_fields(&type_name, &type_data, "IdParameter")?;
@@ -57,8 +56,8 @@ pub fn derive_id_parameter(input: TokenStream) -> SynResult<TokenStream> {
     .into())
 }
 
-pub fn derive_relation(input: TokenStream) -> SynResult<TokenStream> {
-    let mut input: DeriveInput = syn::parse(input)?;
+pub fn derive_relation(input: TokenStream2) -> SynResult<TokenStream2> {
+    let mut input: DeriveInput = syn::parse2(input)?;
     let type_name = input.ident.clone();
     let type_data = input.data.clone();
     let record_type_name = suffix_ident(&type_name, "Record");
@@ -106,7 +105,7 @@ pub fn derive_relation(input: TokenStream) -> SynResult<TokenStream> {
     .into())
 }
 
-pub fn derive_read_relation(input: TokenStream) -> SynResult<TokenStream> {
+pub fn derive_read_relation(input: TokenStream2) -> SynResult<TokenStream2> {
     let (type_name, type_data) = parse_type_ident_and_data(input)?;
     let record_type_name = suffix_ident(&type_name, "Record");
 
@@ -120,7 +119,7 @@ pub fn derive_read_relation(input: TokenStream) -> SynResult<TokenStream> {
     .into())
 }
 
-pub fn derive_write_relation(input: TokenStream) -> SynResult<TokenStream> {
+pub fn derive_write_relation(input: TokenStream2) -> SynResult<TokenStream2> {
     let (type_name, type_data) = parse_type_ident_and_data(input)?;
     let record_type_name = suffix_ident(&type_name, "Record");
 
@@ -134,7 +133,7 @@ pub fn derive_write_relation(input: TokenStream) -> SynResult<TokenStream> {
     .into())
 }
 
-pub fn derive_record(input: TokenStream) -> SynResult<TokenStream> {
+pub fn derive_record(input: TokenStream2) -> SynResult<TokenStream2> {
     let (type_name, type_data) = parse_type_ident_and_data(input)?;
     let relation_type_name = trim_ident_suffix(&type_name, "Record");
 
@@ -156,7 +155,7 @@ pub fn derive_record(input: TokenStream) -> SynResult<TokenStream> {
     .into())
 }
 
-pub fn derive_read_record(input: TokenStream) -> SynResult<TokenStream> {
+pub fn derive_read_record(input: TokenStream2) -> SynResult<TokenStream2> {
     let (type_name, type_data) = parse_type_ident_and_data(input)?;
     let relation_type_name = trim_ident_suffix(&type_name, "Record");
 
@@ -170,7 +169,7 @@ pub fn derive_read_record(input: TokenStream) -> SynResult<TokenStream> {
     .into())
 }
 
-pub fn derive_write_record(input: TokenStream) -> SynResult<TokenStream> {
+pub fn derive_write_record(input: TokenStream2) -> SynResult<TokenStream2> {
     let (type_name, type_data) = parse_type_ident_and_data(input)?;
 
     let relation_type_name = trim_ident_suffix(&type_name, "Record");
@@ -272,7 +271,7 @@ pub fn derive_write_record(input: TokenStream) -> SynResult<TokenStream> {
     .into())
 }
 
-pub fn derive_generate_table(input: TokenStream) -> SynResult<TokenStream> {
+pub fn derive_generate_table(input: TokenStream2) -> SynResult<TokenStream2> {
     let (type_name, type_data) = parse_type_ident_and_data(input)?;
 
     get_struct_data_and_unparsed_fields(&type_name, &type_data, "GenerateTable")?;
@@ -283,7 +282,7 @@ pub fn derive_generate_table(input: TokenStream) -> SynResult<TokenStream> {
     .into())
 }
 
-pub fn derive_single_insert(input: TokenStream) -> SynResult<TokenStream> {
+pub fn derive_single_insert(input: TokenStream2) -> SynResult<TokenStream2> {
     let (type_name, type_data) = parse_type_ident_and_data(input)?;
 
     let (_, unparsed_type_fields) =
@@ -330,7 +329,7 @@ pub fn derive_single_insert(input: TokenStream) -> SynResult<TokenStream> {
     .into())
 }
 
-pub fn derive_bulk_insert(input: TokenStream) -> SynResult<TokenStream> {
+pub fn derive_bulk_insert(input: TokenStream2) -> SynResult<TokenStream2> {
     let (type_name, type_data) = parse_type_ident_and_data(input)?;
     get_struct_data_and_unparsed_fields(&type_name, &type_data, "BulkInsert")?;
 
@@ -340,7 +339,7 @@ pub fn derive_bulk_insert(input: TokenStream) -> SynResult<TokenStream> {
     .into())
 }
 
-pub fn derive_identifiable_record(input: TokenStream) -> SynResult<TokenStream> {
+pub fn derive_identifiable_record(input: TokenStream2) -> SynResult<TokenStream2> {
     let (type_name, type_data) = parse_type_ident_and_data(input)?;
     let (_, unparsed_type_fields) =
         get_struct_data_and_unparsed_fields(&type_name, &type_data, "IdentifiableRecord")?;
@@ -358,12 +357,12 @@ pub fn derive_identifiable_record(input: TokenStream) -> SynResult<TokenStream> 
     .into())
 }
 
-fn parse_type_ident_and_data(input: TokenStream) -> SynResult<(Ident, Data)> {
+fn parse_type_ident_and_data(input: TokenStream2) -> SynResult<(Ident, Data)> {
     let DeriveInput {
         ident: struct_ident,
         data: struct_data,
         ..
-    } = syn::parse(input)?;
+    } = syn::parse2(input)?;
 
     Ok((struct_ident, struct_data))
 }

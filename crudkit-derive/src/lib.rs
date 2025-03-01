@@ -11,7 +11,7 @@ macro_rules! synerror {
 macro_rules! propagate_synerror {
     ( $derive_fn:expr ) => {
         match $derive_fn {
-            Ok(output) => output,
+            Ok(output) => output.into(),
             Err(error) => error.into_compile_error().into(),
         }
     };
@@ -21,55 +21,65 @@ pub(crate) use synerror;
 
 #[proc_macro_derive(IdParameter)]
 pub fn derive_id_parameter(input: TokenStream) -> TokenStream {
-    propagate_synerror!(derives::derive_functions::derive_id_parameter(input))
+    propagate_synerror!(derives::derive_functions::derive_id_parameter(input.into()))
 }
 
 #[proc_macro_derive(Relation, attributes(relation))]
 pub fn derive_relation(input: TokenStream) -> TokenStream {
-    propagate_synerror!(derives::derive_functions::derive_relation(input))
+    propagate_synerror!(derives::derive_functions::derive_relation(input.into()))
 }
 
 #[proc_macro_derive(ReadRelation)]
 pub fn derive_read_relation(input: TokenStream) -> TokenStream {
-    propagate_synerror!(derives::derive_functions::derive_read_relation(input))
+    propagate_synerror!(derives::derive_functions::derive_read_relation(
+        input.into()
+    ))
 }
 
 #[proc_macro_derive(WriteRelation)]
 pub fn derive_write_relation(input: TokenStream) -> TokenStream {
-    propagate_synerror!(derives::derive_functions::derive_write_relation(input))
+    propagate_synerror!(derives::derive_functions::derive_write_relation(
+        input.into()
+    ))
 }
 
 #[proc_macro_derive(Record)]
 pub fn derive_record(input: TokenStream) -> TokenStream {
-    propagate_synerror!(derives::derive_functions::derive_record(input))
+    propagate_synerror!(derives::derive_functions::derive_record(input.into()))
 }
 
 #[proc_macro_derive(ReadRecord)]
 pub fn derive_read_record(input: TokenStream) -> TokenStream {
-    propagate_synerror!(derives::derive_functions::derive_read_record(input))
+    propagate_synerror!(derives::derive_functions::derive_read_record(input.into()))
 }
 
 #[proc_macro_derive(WriteRecord, attributes(auto_primary_key, manual_primary_key))]
 pub fn derive_write_record(input: TokenStream) -> TokenStream {
-    propagate_synerror!(derives::derive_functions::derive_write_record(input))
+    propagate_synerror!(derives::derive_functions::derive_write_record(input.into()))
 }
 
 #[proc_macro_derive(GenerateTable)]
 pub fn derive_generate_table(input: TokenStream) -> TokenStream {
-    propagate_synerror!(derives::derive_functions::derive_generate_table(input))
+    propagate_synerror!(derives::derive_functions::derive_generate_table(
+        input.into()
+    ))
 }
 
 #[proc_macro_derive(SingleInsert, attributes(defaultable))]
 pub fn derive_single_insert(input: TokenStream) -> TokenStream {
-    propagate_synerror!(derives::derive_functions::derive_single_insert(input))
+    propagate_synerror!(derives::derive_functions::derive_single_insert(
+        input.into()
+    ))
 }
 
 #[proc_macro_derive(BulkInsert)]
 pub fn derive_bulk_insert(input: TokenStream) -> TokenStream {
-    propagate_synerror!(derives::derive_functions::derive_bulk_insert(input))
+    propagate_synerror!(derives::derive_functions::derive_bulk_insert(input.into()))
 }
 
 #[proc_macro_derive(IdentifiableRecord)]
 pub fn derive_identifiable_record(input: TokenStream) -> TokenStream {
-    propagate_synerror!(derives::derive_functions::derive_identifiable_record(input))
+    propagate_synerror!(derives::derive_functions::derive_identifiable_record(
+        input.into()
+    ))
 }
