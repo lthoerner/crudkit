@@ -80,3 +80,7 @@ pub trait Record: for<'a> sqlx::FromRow<'a, PgRow> + Send + Unpin + Clone {
     /// knowledge of the record type's field names, it must be emitted as part of [`Record`].
     const COLUMN_NAMES: &[&str];
 }
+
+pub trait IdentifiableRecord {
+    fn id(&self) -> Option<i32>;
+}

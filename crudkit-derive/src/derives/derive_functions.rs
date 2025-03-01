@@ -158,7 +158,7 @@ pub fn derive_record(input: TokenStream) -> SynResult<TokenStream> {
 
 pub fn derive_read_record(input: TokenStream) -> SynResult<TokenStream> {
     let (type_name, type_data) = parse_type_ident_and_data(input)?;
-    let relation_type_name = trim_ident_suffix(&type_name, "ReadRecord");
+    let relation_type_name = trim_ident_suffix(&type_name, "Record");
 
     get_struct_data_and_unparsed_fields(&type_name, &type_data, "ReadRecord")?;
 
@@ -349,7 +349,7 @@ pub fn derive_identifiable_record(input: TokenStream) -> SynResult<TokenStream> 
     let first_field_name = first_field.ident.unwrap();
 
     Ok(quote! {
-        impl crate::database::tables::IdentifiableRecord for #type_name {
+        impl crudkit::traits::shared::IdentifiableRecord for #type_name {
             fn id(&self) -> Option<i32> {
                 self.#first_field_name
             }
