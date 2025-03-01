@@ -262,7 +262,7 @@ pub fn derive_write_record(input: TokenStream) -> SynResult<TokenStream> {
             fn update_one(
                 database: &crudkit::database::PgDatabase,
                 update_params: Self::UpdateQueryParameters,
-            ) -> impl Future<Output = ()> {
+            ) -> impl std::future::Future<Output = ()> {
                 async move {
                     todo!()
                 }
