@@ -2,7 +2,9 @@ use deluxe::ExtractAttributes;
 use proc_macro::TokenStream;
 use proc_macro2::TokenStream as TokenStream2;
 use quote::quote;
-use syn::{parse_macro_input, Data, DeriveInput, Fields, Ident};
+use syn::{
+    Data, DataStruct, DeriveInput, Field, Fields, FieldsNamed, Ident, Result as SynResult, Type,
+};
 
 use crate::synerror;
 
@@ -26,69 +28,42 @@ struct AutoPrimaryKeyAttribute;
 #[deluxe(attributes(manual_primary_key))]
 struct ManualPrimaryKeyAttribute;
 
-#[derive(Clone)]
+#[derive(Clone, PartialEq)]
 enum PrimaryKeyAttribute {
     Auto,
     Manual,
     None,
 }
 
-pub fn derive_id_parameter(input: TokenStream) -> TokenStream {
-    let DeriveInput {
-        ident: type_name,
-        data,
-        ..
-    } = parse_macro_input!(input);
+pub fn derive_id_parameter(input: TokenStream) -> SynResult<TokenStream> {
+    let (type_name, type_data) = parse_type_ident_and_data(input)?;
+    let (_, unparsed_type_fields) =
+        get_struct_data_and_unparsed_fields(&type_name, &type_data, "IdParameter")?;
 
-    let fields = match data {
-        Data::Struct(data_struct) => match data_struct.fields {
-            Fields::Named(fields) => fields,
-            _ => {
-                synerror!(
-                    type_name,
-                    "cannot derive `IdParameter` for unit or tuple structs"
-                )
+    let first_field = unparsed_type_fields.named.into_iter().next().unwrap();
+    let first_field_name = first_field.ident.unwrap();
+
+    Ok(quote! {
+        impl crate::api::IdParameter for #type_name {
+            fn new(#first_field_name: usize) -> Self {
+                Self { #first_field_name }
             }
-        },
-        _ => {
-            synerror!(
-                type_name,
-                "cannot derive `IdParameter` for non-struct types"
-            )
-        }
-    };
 
-    let first_field = fields.named.into_iter().next();
-    if let Some(first_field) = first_field {
-        let first_field_name = first_field.ident.unwrap();
-        quote! {
-            impl crate::api::IdParameter for #type_name {
-                fn new(#first_field_name: usize) -> Self {
-                    Self { #first_field_name }
-                }
-
-                fn id(&self) -> usize {
-                    self.#first_field_name
-                }
+            fn id(&self) -> usize {
+                self.#first_field_name
             }
         }
-        .into()
-    } else {
-        synerror!(
-            type_name,
-            "cannot derive `IdParameter` for structs with no fields"
-        )
     }
+    .into())
 }
 
-pub fn derive_relation(input: TokenStream) -> TokenStream {
-    let mut input: DeriveInput = parse_macro_input!(input);
+pub fn derive_relation(input: TokenStream) -> SynResult<TokenStream> {
+    let mut input: DeriveInput = syn::parse(input)?;
     let type_name = input.ident.clone();
-    let record_type_name = Ident::new(&format!("{}Record", type_name), type_name.span());
+    let type_data = input.data.clone();
+    let record_type_name = suffix_ident(&type_name, "Record");
 
-    let Data::Struct(_) = input.data else {
-        synerror!(type_name, "cannot derive `Relation` for non-struct types")
-    };
+    get_struct_data_and_unparsed_fields(&type_name, &type_data, "Relation")?;
 
     let Ok(RelationAttributes {
         schema_name,
@@ -96,10 +71,10 @@ pub fn derive_relation(input: TokenStream) -> TokenStream {
         primary_key,
     }) = deluxe::extract_attributes(&mut input)
     else {
-        synerror!(
+        return synerror!(
             type_name,
             "cannot derive `Relation` without `#[relation(...)]` attribute"
-        )
+        );
     };
 
     let optional_schema_definition = schema_name.map(|schema_name| {
@@ -108,7 +83,7 @@ pub fn derive_relation(input: TokenStream) -> TokenStream {
         }
     });
 
-    quote! {
+    Ok(quote! {
         impl crudkit::traits::shared::Relation for #type_name {
             type Record = #record_type_name;
             #optional_schema_definition
@@ -128,335 +103,133 @@ pub fn derive_relation(input: TokenStream) -> TokenStream {
             }
         }
     }
-    .into()
+    .into())
 }
 
-pub fn derive_read_relation(input: TokenStream) -> TokenStream {
-    let DeriveInput {
-        ident: type_name,
-        data,
-        ..
-    } = parse_macro_input!(input);
-    let record_type_name = Ident::new(&format!("{}Record", type_name), type_name.span());
+pub fn derive_read_relation(input: TokenStream) -> SynResult<TokenStream> {
+    let (type_name, type_data) = parse_type_ident_and_data(input)?;
+    let record_type_name = suffix_ident(&type_name, "Record");
 
-    let Data::Struct(_) = data else {
-        synerror!(
-            type_name,
-            "cannot derive `ReadRelation` for non-struct types"
-        )
-    };
+    get_struct_data_and_unparsed_fields(&type_name, &type_data, "ReadRelation")?;
 
-    quote! {
+    Ok(quote! {
         impl crudkit::traits::read::ReadRelation for #type_name {
             type ReadRecord = #record_type_name;
         }
     }
-    .into()
+    .into())
 }
 
-pub fn derive_write_relation(input: TokenStream) -> TokenStream {
-    let DeriveInput {
-        ident: type_name,
-        data,
-        ..
-    } = parse_macro_input!(input);
+pub fn derive_write_relation(input: TokenStream) -> SynResult<TokenStream> {
+    let (type_name, type_data) = parse_type_ident_and_data(input)?;
+    let record_type_name = suffix_ident(&type_name, "Record");
 
-    let record_type_name = Ident::new(&format!("{}Record", type_name), type_name.span());
+    get_struct_data_and_unparsed_fields(&type_name, &type_data, "WriteRelation")?;
 
-    let Data::Struct(_) = data else {
-        synerror!(
-            type_name,
-            "cannot derive `WriteRelation` for non-struct types"
-        )
-    };
-
-    quote! {
+    Ok(quote! {
         impl crudkit::traits::write::WriteRelation for #type_name {
             type WriteRecord = #record_type_name;
         }
     }
-    .into()
+    .into())
 }
 
-pub fn derive_record(input: TokenStream) -> TokenStream {
-    let DeriveInput {
-        ident: type_name,
-        data,
-        ..
-    } = parse_macro_input!(input);
+pub fn derive_record(input: TokenStream) -> SynResult<TokenStream> {
+    let (type_name, type_data) = parse_type_ident_and_data(input)?;
+    let relation_type_name = trim_ident_suffix(&type_name, "Record");
 
-    let relation_type_name = Ident::new(
-        type_name.clone().to_string().trim_end_matches("Record"),
-        type_name.span(),
-    );
+    let (_, unparsed_type_fields) =
+        get_struct_data_and_unparsed_fields(&type_name, &type_data, "Record")?;
 
-    let Data::Struct(data_struct) = data else {
-        synerror!(type_name, "cannot derive `Record` for non-struct types")
-    };
+    let column_names: Vec<String> = parse_field_data(&unparsed_type_fields)?
+        .into_iter()
+        .map(|f| f.name)
+        .collect();
 
-    let Fields::Named(_) = &data_struct.fields else {
-        synerror!(
-            type_name,
-            "cannot derive `SingleInsert` for unit or tuple structs"
-        )
-    };
-
-    let mut column_names: Vec<String> = Vec::new();
-    for field in data_struct.fields.iter() {
-        let field_ident = field.ident.clone().unwrap();
-        // TODO: Use the #[sqlx(rename = "<name>")] attribute
-        let field_name = field_ident
-            .clone()
-            .to_string()
-            .trim_start_matches("r#")
-            .to_owned();
-
-        column_names.push(field_name);
-    }
-
-    quote! {
+    Ok(quote! {
         impl crudkit::traits::shared::Record for #type_name {
             const COLUMN_NAMES: &[&str] = &[#(#column_names),*];
 
             type Relation = #relation_type_name;
         }
     }
-    .into()
+    .into())
 }
 
-pub fn derive_read_record(input: TokenStream) -> TokenStream {
-    let DeriveInput {
-        ident: type_name,
-        data,
-        ..
-    } = parse_macro_input!(input);
+pub fn derive_read_record(input: TokenStream) -> SynResult<TokenStream> {
+    let (type_name, type_data) = parse_type_ident_and_data(input)?;
+    let relation_type_name = trim_ident_suffix(&type_name, "Record");
 
-    let relation_type_name = Ident::new(
-        type_name.clone().to_string().trim_end_matches("Record"),
-        type_name.span(),
-    );
+    get_struct_data_and_unparsed_fields(&type_name, &type_data, "ReadRecord")?;
 
-    let Data::Struct(_) = data else {
-        synerror!(type_name, "cannot derive `ReadRecord` for non-struct types")
-    };
-
-    quote! {
+    Ok(quote! {
         impl crudkit::traits::read::ReadRecord for #type_name {
             type ReadRelation = #relation_type_name;
         }
     }
-    .into()
+    .into())
 }
 
-pub fn derive_write_record(input: TokenStream) -> TokenStream {
-    let DeriveInput {
-        ident: type_name,
-        data,
-        ..
-    } = parse_macro_input!(input);
+pub fn derive_write_record(input: TokenStream) -> SynResult<TokenStream> {
+    let (type_name, type_data) = parse_type_ident_and_data(input)?;
 
-    let relation_type_name = Ident::new(
-        type_name.clone().to_string().trim_end_matches("Record"),
-        type_name.span(),
-    );
+    let relation_type_name = trim_ident_suffix(&type_name, "Record");
+    let create_params_type_name = suffix_ident(&type_name, "CreateQueryParameters");
+    let update_params_type_name = suffix_ident(&type_name, "UpdateQueryParameters");
 
-    let create_params_type_name = Ident::new(
-        &format!("{}CreateQueryParameters", type_name),
-        type_name.span(),
-    );
+    let (_, unparsed_type_fields) =
+        get_struct_data_and_unparsed_fields(&type_name, &type_data, "WriteRecord")?;
 
-    let update_params_type_name = Ident::new(
-        &format!("{}UpdateQueryParameters", type_name),
-        type_name.span(),
-    );
+    let type_fields = parse_field_data_with_attributes(&type_name, &unparsed_type_fields)?;
 
-    let fields = match data {
-        Data::Struct(data_struct) => match data_struct.fields {
-            Fields::Named(fields) => fields,
-            _ => {
-                synerror!(
-                    type_name,
-                    "cannot derive `WriteRecord` for unit or tuple structs"
-                )
-            }
-        },
-        _ => {
-            synerror!(
-                type_name,
-                "cannot derive `WriteRecord` for non-struct types"
-            )
-        }
-    };
-
-    let mut fields_with_primary_key_flags = Vec::new();
-    for mut field in fields.named {
-        let auto_primary_key =
-            deluxe::extract_attributes::<_, AutoPrimaryKeyAttribute>(&mut field).is_ok();
-        let manual_primary_key =
-            deluxe::extract_attributes::<_, ManualPrimaryKeyAttribute>(&mut field).is_ok();
-
-        let primary_key_flag = match (auto_primary_key, manual_primary_key) {
-            (true, true) => synerror!(type_name, "cannot use both `#[auto_primary_key]` and `#[manual_primary_key]` on a single column"),
-            (true, false) => PrimaryKeyAttribute::Auto,
-            (false, true) => PrimaryKeyAttribute::Manual,
-            (false, false) => PrimaryKeyAttribute::None,
-        };
-
-        fields_with_primary_key_flags.push((field, primary_key_flag))
-    }
-
-    let (primary_key_fields, primary_key_field_accessors): (Vec<Ident>, Vec<TokenStream2>) =
-        fields_with_primary_key_flags
-            .iter()
-            .filter_map(|(f, pk)| {
-                let field_name = f.ident.clone().unwrap();
-                match pk {
-                    PrimaryKeyAttribute::Auto => {
-                        Some((field_name.clone(), quote!(#field_name.unwrap())))
-                    }
-                    PrimaryKeyAttribute::Manual => Some((field_name.clone(), quote!(#field_name))),
-                    _ => None,
-                }
-            })
-            .unzip();
-
-    let key_placeholders: Vec<String> = primary_key_fields
+    let key_placeholders: Vec<String> = type_fields
         .iter()
-        .map(|f| format!("{} = {{}}", f.to_string()))
+        .map(|f| format!("{} = {{}}", f.data.name))
         .collect();
     let where_clause_with_key_placeholders = format!("WHERE {}", key_placeholders.join(", "));
 
-    let create_query_parameter_fields: Vec<TokenStream2> = fields_with_primary_key_flags
-        .clone()
-        .into_iter()
-        .filter_map(|(f, pk)| match pk {
+    let create_query_parameter_fields: Vec<TokenStream2> = type_fields
+        .iter()
+        .filter_map(|f| match f.primary_key {
             PrimaryKeyAttribute::Auto => None,
             _ => {
                 // * This needs to be done instead of just using `quote!(#f)` because otherwise, any
                 // * additional attributes on the field would be included in the output
-                let field_name = f.ident.unwrap();
-                let field_type = f.ty;
+                let field_name = f.data.ident.clone();
+                let field_type = f.data.r#type.clone();
                 Some(quote!(#field_name: #field_type))
             }
         })
         .collect();
 
-    let create_query_mapped_fields: Vec<TokenStream2> = fields_with_primary_key_flags
-        .clone()
-        .into_iter()
-        .map(|(f, pk)| {
-            let field_name = f.ident.unwrap();
-            match pk {
+    let create_query_mapped_fields: Vec<TokenStream2> = type_fields
+        .iter()
+        .map(|f| {
+            let field_name = f.data.ident.clone();
+            match f.primary_key {
                 PrimaryKeyAttribute::Auto => quote!(#field_name: None),
                 _ => quote!(#field_name: params.#field_name),
             }
         })
         .collect();
 
-    let update_query_parameter_fields: Vec<TokenStream2> = fields_with_primary_key_flags
-        .into_iter()
-        .map(|(f, pk)| {
-            let field_type = f.ty.clone();
-            let (new_field_name, new_field_type) = match pk {
-                PrimaryKeyAttribute::None => {
-                    let field_name_string = f
-                        .ident
-                        .clone()
-                        .unwrap()
-                        .to_string()
-                        .trim_start_matches("r#")
-                        .to_owned();
-
-                    (
-                        Ident::new(&format!("new_{}", field_name_string), type_name.span()),
-                        quote!(Option<#field_type>),
-                    )
-                }
-                _ => (f.ident.unwrap(), quote!(#field_type)),
+    let update_query_parameter_fields: Vec<TokenStream2> = type_fields
+        .iter()
+        .map(|f| {
+            let field_type = f.data.r#type.clone();
+            let (new_field_name, new_field_type) = match f.primary_key {
+                PrimaryKeyAttribute::None => (
+                    Ident::new(&format!("new_{}", f.data.name), type_name.span()),
+                    quote!(Option<#field_type>),
+                ),
+                _ => (f.data.ident.clone(), quote!(#field_type)),
             };
 
             quote!(#new_field_name: #new_field_type)
         })
         .collect();
 
-    let _ = quote! {
-        let CustomersUpdateParams {
-            id,
-            name,
-            email_address,
-            phone_number,
-            street_address,
-        } = params;
-
-        let mut column_bind_specifiers = Vec::new();
-
-        if name.is_some() {
-            column_bind_specifiers.push(format!("name = ${}", column_bind_specifiers.len() + 1));
-        }
-
-        if email_address.is_some() {
-            column_bind_specifiers.push(format!(
-                "email_address = ${}",
-                column_bind_specifiers.len() + 1
-            ));
-        }
-
-        if phone_number.is_some() {
-            column_bind_specifiers.push(format!(
-                "phone_number = ${}",
-                column_bind_specifiers.len() + 1
-            ));
-        }
-
-        if phone_number.is_some() {
-            column_bind_specifiers.push(format!(
-                "street_address = ${}",
-                column_bind_specifiers.len() + 1
-            ));
-        }
-
-        let where_clause = format!(
-            #where_clause_with_key_placeholders,
-            #(
-                #primary_key_field_accessors
-            ),*
-        );
-
-        let query_string = format!(
-            "UPDATE {}.{} SET {} {}",
-            Self::SCHEMA_NAME,
-            Self::RELATION_NAME,
-            column_bind_specifiers.join(", "),
-            where_clause,
-        );
-
-        use crudkit::traits::shared::Relation;
-        let mut query = sqlx::query(&query_string);
-
-        if let Some(name) = name {
-            query = query.bind(name);
-        }
-
-        if let Some(email_address) = email_address {
-            query = query.bind(email_address);
-        }
-
-        if let Some(phone_number) = phone_number {
-            query = query.bind(phone_number);
-        }
-
-        if let Some(street_address) = street_address {
-            query = query.bind(street_address);
-        }
-
-        if !column_bind_specifiers.is_empty() {
-            query.execute(&state.database.connection).await.unwrap();
-        }
-
-        http::StatusCode::OK
-    };
-
-    quote! {
+    Ok(quote! {
         #[derive(Clone, serde::Deserialize)]
         pub struct #create_params_type_name {
             #(
@@ -485,82 +258,64 @@ pub fn derive_write_record(input: TokenStream) -> TokenStream {
             type WriteRelation = #relation_type_name;
             type CreateQueryParameters = #create_params_type_name;
             type UpdateQueryParameters = #update_params_type_name;
+
+            fn update_one(
+                database: &crudkit::database::PgDatabase,
+                update_params: Self::UpdateQueryParameters,
+            ) -> impl std::future::Future<Output = ()> {
+                async move {
+                    todo!()
+                }
+            }
         }
     }
-    .into()
+    .into())
 }
 
-pub fn derive_generate_table(input: TokenStream) -> TokenStream {
-    let DeriveInput {
-        ident: type_name,
-        data,
-        ..
-    } = parse_macro_input!(input);
-    let Data::Struct(_) = data else {
-        synerror!(
-            type_name,
-            "cannot derive `GenerateTable` for non-struct types"
-        )
-    };
+pub fn derive_generate_table(input: TokenStream) -> SynResult<TokenStream> {
+    let (type_name, type_data) = parse_type_ident_and_data(input)?;
 
-    quote! {
+    get_struct_data_and_unparsed_fields(&type_name, &type_data, "GenerateTable")?;
+
+    Ok(quote! {
         impl crate::database::traits::generate::GenerateTable for #type_name {}
     }
-    .into()
+    .into())
 }
 
-pub fn derive_single_insert(input: TokenStream) -> TokenStream {
-    let DeriveInput {
-        ident: type_name,
-        data,
-        ..
-    } = parse_macro_input!(input);
+pub fn derive_single_insert(input: TokenStream) -> SynResult<TokenStream> {
+    let (type_name, type_data) = parse_type_ident_and_data(input)?;
 
-    let Data::Struct(data_struct) = data else {
-        synerror!(
-            type_name,
-            "cannot derive `SingleInsert` for non-struct types"
-        )
-    };
+    let (_, unparsed_type_fields) =
+        get_struct_data_and_unparsed_fields(&type_name, &type_data, "SingleInsert")?;
 
-    let fields: Vec<(Ident, bool)> = {
-        let Fields::Named(_) = &data_struct.fields else {
-            synerror!(
-                type_name,
-                "cannot derive `SingleInsert` for unit or tuple structs"
-            )
-        };
+    let type_fields = parse_field_data_with_attributes(&type_name, &unparsed_type_fields)?;
 
-        let mut defaultable_fields: Vec<(Ident, bool)> = Vec::new();
-        for mut field in data_struct.fields.into_iter() {
-            let field_ident = field.ident.clone().unwrap();
-            let defaultable_attribute: Option<DefaultableRecordAttribute> =
-                deluxe::extract_attributes(&mut field).ok();
+    let binding_statements: Vec<TokenStream2> = type_fields
+        .into_iter()
+        .map(|f| {
+            let FieldDataWithAttributeFlags {
+                data: FieldData {
+                    ident: field_ident, ..
+                },
+                defaultable,
+                ..
+            } = f;
 
-            defaultable_fields.push((field_ident, defaultable_attribute.is_some()));
-        }
-
-        defaultable_fields
-    };
-
-    let mut binding_statements = Vec::new();
-    for (column_ident, defaultable) in fields {
-        let binding_or_default = match defaultable {
-            true => {
+            if defaultable {
                 quote! {
-                    match record.#column_ident {
+                    match record.#field_ident {
                         Some(column_value) => { builder.push_bind(column_value); },
                         None => { builder.push("DEFAULT"); },
                     }
                 }
+            } else {
+                quote!(builder.push_bind(record.#field_ident);)
             }
-            false => quote!(builder.push_bind(record.#column_ident);),
-        };
+        })
+        .collect();
 
-        binding_statements.push(binding_or_default);
-    }
-
-    quote! {
+    Ok(quote! {
         impl crudkit::traits::write::SingleInsert for #type_name {
             fn push_column_bindings(
                 mut builder: sqlx::query_builder::Separated<sqlx::Postgres, &str>,
@@ -572,65 +327,168 @@ pub fn derive_single_insert(input: TokenStream) -> TokenStream {
             }
         }
     }
-    .into()
+    .into())
 }
 
-pub fn derive_bulk_insert(input: TokenStream) -> TokenStream {
-    let DeriveInput {
-        ident: type_name,
-        data,
-        ..
-    } = parse_macro_input!(input);
-    let Data::Struct(_) = data else {
-        synerror!(type_name, "cannot derive `BulkInsert` for non-struct types")
-    };
+pub fn derive_bulk_insert(input: TokenStream) -> SynResult<TokenStream> {
+    let (type_name, type_data) = parse_type_ident_and_data(input)?;
+    get_struct_data_and_unparsed_fields(&type_name, &type_data, "BulkInsert")?;
 
-    quote! {
+    Ok(quote! {
         impl crudkit::traits::write::BulkInsert for #type_name {}
     }
-    .into()
+    .into())
 }
 
-pub fn derive_identifiable_record(input: TokenStream) -> TokenStream {
-    let DeriveInput {
-        ident: type_name,
-        data,
-        ..
-    } = parse_macro_input!(input);
+pub fn derive_identifiable_record(input: TokenStream) -> SynResult<TokenStream> {
+    let (type_name, type_data) = parse_type_ident_and_data(input)?;
+    let (_, unparsed_type_fields) =
+        get_struct_data_and_unparsed_fields(&type_name, &type_data, "IdentifiableRecord")?;
 
-    let fields = match data {
-        Data::Struct(data_struct) => match data_struct.fields {
-            Fields::Named(fields) => fields,
-            _ => {
-                synerror!(
-                    type_name,
-                    "cannot derive `IdentifiableRecord` for unit or tuple structs"
-                )
+    let first_field = unparsed_type_fields.named.into_iter().next().unwrap();
+    let first_field_name = first_field.ident.unwrap();
+
+    Ok(quote! {
+        impl crudkit::traits::shared::IdentifiableRecord for #type_name {
+            fn id(&self) -> Option<i32> {
+                self.#first_field_name
             }
-        },
-        _ => {
-            synerror!(
-                type_name,
-                "cannot derive `IdentifiableRecord` for non-struct types"
-            )
         }
+    }
+    .into())
+}
+
+fn parse_type_ident_and_data(input: TokenStream) -> SynResult<(Ident, Data)> {
+    let DeriveInput {
+        ident: struct_ident,
+        data: struct_data,
+        ..
+    } = syn::parse(input)?;
+
+    Ok((struct_ident, struct_data))
+}
+
+fn get_struct_data_and_unparsed_fields(
+    ident: &Ident,
+    data: &Data,
+    trait_name: &str,
+) -> SynResult<(DataStruct, FieldsNamed)> {
+    let Data::Struct(data_struct) = data else {
+        return synerror!(
+            ident,
+            format!("cannot derive `{}` for non-struct types", trait_name)
+        );
     };
 
-    let first_field = fields.named.into_iter().next();
-    if let Some(first_field) = first_field {
-        let first_field_name = first_field.ident.unwrap();
-        quote! {
-            impl crate::database::tables::IdentifiableRecord for #type_name {
-                fn id(&self) -> Option<i32> {
-                    self.#first_field_name
-                }
-            }
+    let Fields::Named(struct_fields) = &data_struct.fields else {
+        return synerror!(
+            ident,
+            format!("cannot derive `{}` for unit or tuple structs", trait_name)
+        );
+    };
+
+    Ok((data_struct.clone(), struct_fields.clone()))
+}
+
+fn parse_field_data(unparsed_fields: &FieldsNamed) -> SynResult<Vec<FieldData>> {
+    Ok(unparsed_fields.named.iter().map(FieldData::from).collect())
+}
+
+fn parse_field_data_with_attributes(
+    struct_ident: &Ident,
+    unparsed_fields: &FieldsNamed,
+) -> SynResult<Vec<FieldDataWithAttributeFlags>> {
+    unparsed_fields
+        .named
+        .clone()
+        .into_iter()
+        .map(|mut f| {
+            let auto_primary_key =
+                deluxe::extract_attributes::<_, AutoPrimaryKeyAttribute>(&mut f).is_ok();
+            let manual_primary_key =
+                deluxe::extract_attributes::<_, ManualPrimaryKeyAttribute>(&mut f).is_ok();
+            let defaultable = deluxe::extract_attributes::<_, DefaultableRecordAttribute>(&mut f).is_ok();
+
+            let primary_key = match (auto_primary_key, manual_primary_key) {
+                (true, true) => return synerror!(struct_ident, "cannot use both `#[auto_primary_key]` and `#[manual_primary_key]` on a single column"),
+                (true, false) => PrimaryKeyAttribute::Auto,
+                (false, true) => PrimaryKeyAttribute::Manual,
+                (false, false) => PrimaryKeyAttribute::None,
+            };
+
+            let data = FieldData::from(&f);
+
+            Ok(FieldDataWithAttributeFlags{ data, primary_key, defaultable })
+        })
+        .collect()
+}
+
+fn field_name_string(field: &Field) -> String {
+    field
+        .ident
+        .clone()
+        .unwrap()
+        .to_string()
+        .trim_start_matches("r#")
+        .to_owned()
+}
+
+fn prefix_ident(ident: &Ident, prefix: &str) -> Ident {
+    Ident::new(&format!("{}{}", prefix, ident), ident.span())
+}
+
+fn suffix_ident(ident: &Ident, suffix: &str) -> Ident {
+    Ident::new(&format!("{}{}", ident, suffix), ident.span())
+}
+
+fn trim_ident_prefix(ident: &Ident, prefix: &str) -> Ident {
+    Ident::new(
+        ident.clone().to_string().trim_start_matches(prefix),
+        ident.span(),
+    )
+}
+
+fn trim_ident_suffix(ident: &Ident, suffix: &str) -> Ident {
+    Ident::new(
+        ident.clone().to_string().trim_end_matches(suffix),
+        ident.span(),
+    )
+}
+
+struct FieldData {
+    ident: Ident,
+    r#type: Type,
+    name: String,
+}
+
+struct FieldDataWithAttributeFlags {
+    data: FieldData,
+    primary_key: PrimaryKeyAttribute,
+    defaultable: bool,
+}
+
+impl From<&Field> for FieldData {
+    fn from(value: &Field) -> Self {
+        let ident = value.ident.clone().unwrap();
+        let r#type = value.ty.clone();
+        let name = field_name_string(&value);
+
+        Self {
+            ident,
+            r#type,
+            name,
         }
-        .into()
-    } else {
-        synerror!(
-            type_name,
-            "cannot derive `IdentifiableRecord` for structs with no fields"
-        )
+    }
+}
+
+impl From<FieldData> for Ident {
+    fn from(value: FieldData) -> Self {
+        value.ident
+    }
+}
+
+impl From<FieldData> for String {
+    fn from(value: FieldData) -> Self {
+        value.name
     }
 }
