@@ -12,6 +12,7 @@ pub trait IdParameter {
 
 /// A simple query parameter type to be used in handler functions if the only necessary parameter is
 /// a numerical ID.
+#[derive(Clone, Copy)]
 pub struct GenericIdParameter {
     id: usize,
 }

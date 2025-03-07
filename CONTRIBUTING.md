@@ -215,6 +215,46 @@ to the Git repository. Do not edit the `.gitignore` unless there is a compelling
 Instead, use `.git/info/exclude` for a local-only blacklist.
 
 ### Testing Workflows
-At the moment we do not have any testing workflows, but this will change in the near future.
-Specifically, we will be setting up regression tests using Cargo's built-in testing framework and we
-will request that contributors ensure their code passes the test suite before publishing a final PR.
+Run tests with `cargo test`.
+
+We request that contributors ensure their code passes the test suite before publishing a final PR.
+
+#### Environment variables
+Some integration tests for CRUDkit require a database (more on this below), these integration tests
+also require certain environment variables to be set in order to connect to the database. These
+variables can be read from your environment or from a `.env` file in the root of the repository. The
+required variables are shown below with default values, add these to a `.env` file changing any
+values as you see fit.
+
+    DB_PORT=5432
+    APP_USER=app_user
+    APP_USER_PWD=password
+    APP_DB_NAME=crudkit_test_db
+
+Although not required it is also recommended that you change the superuser password.
+
+    SUPERUSER_PWD=password
+
+#### Creating a test database
+Some integration tests for CRUDkit require a database, follow these instructions to create a local
+database for local testing. Note that these instructions use Bash shell scripts, if you are running
+Windows it is recommended to use the Windows Subsystem for Linux (WSL) to run the scripts.
+
+Requirements:
+
+- [Docker](https://www.docker.com/)
+- [sqlx-cli](https://crates.io/crates/sqlx-cli), install with the following command  `cargo install
+  --version="~0.8" sqlx-cli --no-default-features --features rustls,postgres`
+
+To create a database for testing run:
+
+    ./scripts/init_db.sh
+
+Default values in the script can be overwritten with environment variables. It will also read values
+from the `.env` file described above.
+
+- If the database is already running you can just run migrations with `SKIP_DOCKER=true
+  ./scripts/init_db.sh`.
+- New database migrations can be created with `sqlx migrate add migration_name`.
+- Note that if you want to rebuild the database from scratch you will need to delete the existing
+  docker container, by default it is called crudkit_db.
