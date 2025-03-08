@@ -18,6 +18,17 @@ dependencies = [
 ]
 
 [[package]]
+name = "crudkit-derive"
+version = "0.1.0"
+dependencies = [
+ "convert_case",
+ "deluxe",
+ "proc-macro2",
+ "quote",
+ "syn",
+]
+
+[[package]]
 name = "deluxe"
 version = "0.5.0"
 source = "git+https://code.lthoerner.com/deluxe#b6d59a9aac0fa972b587befb766c9b8e577c8f7a"
@@ -118,17 +129,6 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "5e719e8df665df0d1c8fbfd238015744736151d4445ec0836b8e628aae103b77"
 dependencies = [
  "unicode-ident",
-]
-
-[[package]]
-name = "proc-macros"
-version = "0.1.0"
-dependencies = [
- "convert_case",
- "deluxe",
- "proc-macro2",
- "quote",
- "syn",
 ]
 
 [[package]]

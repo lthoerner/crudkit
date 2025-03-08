@@ -43,7 +43,7 @@ pub fn derive_id_parameter(input: TokenStream2) -> SynResult<TokenStream2> {
     let first_field_name = first_field.ident.unwrap();
 
     Ok(quote! {
-        impl crate::api::IdParameter for #type_name {
+        impl crudkit::traits::id_parameter::IdParameter for #type_name {
             fn new(#first_field_name: usize) -> Self {
                 Self { #first_field_name }
             }
@@ -181,50 +181,113 @@ pub fn derive_write_record(input: TokenStream2) -> SynResult<TokenStream2> {
 
     let type_fields = parse_field_data_with_attributes(&type_name, &unparsed_type_fields)?;
 
-    let key_placeholders: Vec<String> = type_fields
-        .iter()
-        .map(|f| format!("{} = {{}}", f.data.name))
-        .collect();
-    let where_clause_with_key_placeholders = format!("WHERE {}", key_placeholders.join(", "));
+    let type_field_idents: Vec<Ident> = type_fields.iter().map(|f| f.data.ident.clone()).collect();
 
-    let create_query_parameter_fields: Vec<TokenStream2> = type_fields
+    let primary_key_field_data_and_accessors: Vec<(FieldData, TokenStream2)> = type_fields
+        .iter()
+        .filter_map(|f| {
+            let field_ident = f.data.ident.clone();
+            match f.primary_key {
+                PrimaryKeyAttribute::Auto => Some((f.data.clone(), quote!(#field_ident.unwrap()))),
+                PrimaryKeyAttribute::Manual => Some((f.data.clone(), quote!(#field_ident))),
+                PrimaryKeyAttribute::None => None,
+            }
+        })
+        .collect();
+
+    let where_clause_primary_key_conditions: Vec<TokenStream2> =
+        primary_key_field_data_and_accessors
+            .iter()
+            .map(|(data, accessor)| {
+                let field_name = data.name.clone();
+                quote! {
+                    format!("{} = {}", #field_name, #accessor)
+                }
+            })
+            .collect();
+
+    let where_clause_builder = quote! {
+        let mut where_clause_conditions = Vec::new();
+        #(
+            where_clause_conditions.push(#where_clause_primary_key_conditions);
+        )*
+
+        let where_clause_conditions = where_clause_conditions.join(" AND ");
+        let where_clause = format!("WHERE {}", where_clause_conditions);
+    };
+
+    let conditional_column_specifiers: Vec<TokenStream2> = type_fields
+        .iter()
+        .filter_map(|f| {
+            if f.primary_key == PrimaryKeyAttribute::None {
+                let field_ident = f.data.ident.clone();
+                let field_name = f.data.name.clone();
+                Some(quote! {
+                    if #field_ident.is_some() {
+                        column_bind_specifiers.push(format!(
+                            concat!(#field_name, " = ${}"),
+                            column_bind_specifiers.len() + 1
+                        ));
+                    }
+                })
+            } else {
+                None
+            }
+        })
+        .collect();
+
+    let conditional_binding_statements: Vec<TokenStream2> = type_fields
+        .iter()
+        .filter_map(|f| {
+            if f.primary_key == PrimaryKeyAttribute::None {
+                let field_ident = f.data.ident.clone();
+                Some(quote! {
+                    if let Some(#field_ident) = #field_ident {
+                        query = query.bind(#field_ident);
+                    }
+                })
+            } else {
+                None
+            }
+        })
+        .collect();
+
+    let create_params_field_declarations: Vec<TokenStream2> = type_fields
         .iter()
         .filter_map(|f| match f.primary_key {
             PrimaryKeyAttribute::Auto => None,
             _ => {
                 // * This needs to be done instead of just using `quote!(#f)` because otherwise, any
                 // * additional attributes on the field would be included in the output
-                let field_name = f.data.ident.clone();
+                let field_ident = f.data.ident.clone();
                 let field_type = f.data.r#type.clone();
-                Some(quote!(#field_name: #field_type))
+                Some(quote!(#field_ident: #field_type))
             }
         })
         .collect();
 
-    let create_query_mapped_fields: Vec<TokenStream2> = type_fields
+    let create_params_mapped_fields: Vec<TokenStream2> = type_fields
         .iter()
         .map(|f| {
-            let field_name = f.data.ident.clone();
+            let field_ident = f.data.ident.clone();
             match f.primary_key {
-                PrimaryKeyAttribute::Auto => quote!(#field_name: None),
-                _ => quote!(#field_name: params.#field_name),
+                PrimaryKeyAttribute::Auto => quote!(#field_ident: None),
+                _ => quote!(#field_ident: params.#field_ident),
             }
         })
         .collect();
 
-    let update_query_parameter_fields: Vec<TokenStream2> = type_fields
+    let update_params_field_declarations: Vec<TokenStream2> = type_fields
         .iter()
         .map(|f| {
+            let field_ident = f.data.ident.clone();
             let field_type = f.data.r#type.clone();
-            let (new_field_name, new_field_type) = match f.primary_key {
-                PrimaryKeyAttribute::None => (
-                    Ident::new(&format!("new_{}", f.data.name), type_name.span()),
-                    quote!(Option<#field_type>),
-                ),
-                _ => (f.data.ident.clone(), quote!(#field_type)),
+            let new_field_type = match f.primary_key {
+                PrimaryKeyAttribute::None => quote!(Option<#field_type>),
+                _ => quote!(#field_type),
             };
 
-            quote!(#new_field_name: #new_field_type)
+            quote!(#field_ident: #new_field_type)
         })
         .collect();
 
@@ -232,14 +295,14 @@ pub fn derive_write_record(input: TokenStream2) -> SynResult<TokenStream2> {
         #[derive(Clone, serde::Deserialize)]
         pub struct #create_params_type_name {
             #(
-                #create_query_parameter_fields
+                #create_params_field_declarations
             ),*
         }
 
         #[derive(Clone, serde::Deserialize)]
         pub struct #update_params_type_name {
             #(
-                #update_query_parameter_fields
+                #update_params_field_declarations
             ),*
         }
 
@@ -247,7 +310,7 @@ pub fn derive_write_record(input: TokenStream2) -> SynResult<TokenStream2> {
             fn from(params: #create_params_type_name) -> Self {
                 Self {
                     #(
-                        #create_query_mapped_fields
+                        #create_params_mapped_fields
                     ),*
                 }
             }
@@ -258,26 +321,44 @@ pub fn derive_write_record(input: TokenStream2) -> SynResult<TokenStream2> {
             type CreateQueryParameters = #create_params_type_name;
             type UpdateQueryParameters = #update_params_type_name;
 
-            fn update_one(
+            async fn update_one(
                 database: &crudkit::database::PgDatabase,
                 update_params: Self::UpdateQueryParameters,
-            ) -> impl std::future::Future<Output = ()> {
-                async move {
-                    todo!()
+            ) {
+                let #update_params_type_name {
+                    #(
+                        #type_field_idents
+                    ),*
+                } = update_params;
+
+                #where_clause_builder
+
+                let mut column_bind_specifiers: Vec<String> = Vec::new();
+
+                #(
+                    #conditional_column_specifiers
+                )*
+
+                let query_string = format!(
+                    "UPDATE {}.{} SET {} {}",
+                    Self::Relation::SCHEMA_NAME,
+                    Self::Relation::RELATION_NAME,
+                    column_bind_specifiers.join(", "),
+                    where_clause,
+                );
+
+                use crudkit::traits::shared::Relation;
+                let mut query = sqlx::query(&query_string);
+
+                #(
+                    #conditional_binding_statements
+                )*
+
+                if !column_bind_specifiers.is_empty() {
+                    query.execute(&database.connection).await.unwrap();
                 }
             }
         }
-    }
-    .into())
-}
-
-pub fn derive_generate_table(input: TokenStream2) -> SynResult<TokenStream2> {
-    let (type_name, type_data) = parse_type_ident_and_data(input)?;
-
-    get_struct_data_and_unparsed_fields(&type_name, &type_data, "GenerateTable")?;
-
-    Ok(quote! {
-        impl crate::database::traits::generate::GenerateTable for #type_name {}
     }
     .into())
 }
@@ -350,7 +431,7 @@ pub fn derive_identifiable_record(input: TokenStream2) -> SynResult<TokenStream2
     Ok(quote! {
         impl crudkit::traits::shared::IdentifiableRecord for #type_name {
             fn id(&self) -> Option<i32> {
-                self.#first_field_name
+                self.#first_field_name.into()
             }
         }
     }
@@ -454,6 +535,7 @@ fn trim_ident_suffix(ident: &Ident, suffix: &str) -> Ident {
     )
 }
 
+#[derive(Clone)]
 struct FieldData {
     ident: Ident,
     r#type: Type,

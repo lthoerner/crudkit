@@ -1,4 +1,6 @@
 mod derives;
+#[cfg(test)]
+mod tests;
 
 use proc_macro::{self, TokenStream};
 
@@ -56,13 +58,6 @@ pub fn derive_read_record(input: TokenStream) -> TokenStream {
 #[proc_macro_derive(WriteRecord, attributes(auto_primary_key, manual_primary_key))]
 pub fn derive_write_record(input: TokenStream) -> TokenStream {
     propagate_synerror!(derives::derive_functions::derive_write_record(input.into()))
-}
-
-#[proc_macro_derive(GenerateTable)]
-pub fn derive_generate_table(input: TokenStream) -> TokenStream {
-    propagate_synerror!(derives::derive_functions::derive_generate_table(
-        input.into()
-    ))
 }
 
 #[proc_macro_derive(SingleInsert, attributes(defaultable))]

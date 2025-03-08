@@ -13,7 +13,7 @@ use super::write::{WriteRecord, WriteRelation};
 /// derived, particularly [`ReadRelation`], [`WriteRelation`], [`ReadRecord`], and [`WriteRecord`].
 ///
 /// Also see [`Record`].
-pub trait Relation: Sized {
+pub trait Relation: Sized + Send + Sync {
     /// The record type which this relation contains a collection of.
     ///
     /// This type and the [`Record::Relation`] type are directly interreferential to allow
@@ -67,7 +67,7 @@ pub trait Relation: Sized {
 /// derived, particularly [`ReadRelation`], [`WriteRelation`], [`ReadRecord`], and [`WriteRecord`].
 ///
 /// Also see [`Relation`].
-pub trait Record: for<'a> sqlx::FromRow<'a, PgRow> + Send + Unpin + Clone {
+pub trait Record: for<'a> sqlx::FromRow<'a, PgRow> + Send + Sync + Unpin + Clone {
     /// The relation type which contains a collection of this record type.
     ///
     /// This type and the [`Relation::Record`] type are directly interreferential to allow
@@ -78,9 +78,12 @@ pub trait Record: for<'a> sqlx::FromRow<'a, PgRow> + Send + Unpin + Clone {
     ///
     /// This would have been a member of [`Relation`], but since the derive macro must rely on
     /// knowledge of the record type's field names, it must be emitted as part of [`Record`].
+    // TODO: Maybe add primary key columns array for use with multi-PK query generation
     const COLUMN_NAMES: &[&str];
 }
 
+// TODO: Add documentation
+// ? Should this really be an `Option`?
 pub trait IdentifiableRecord {
     fn id(&self) -> Option<i32>;
 }

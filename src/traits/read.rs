@@ -37,7 +37,7 @@ pub trait ReadRelation: Relation {
     fn query_one<I: IdParameter>(
         database: &PgDatabase,
         id: I,
-    ) -> impl Future<Output = Option<Self::ReadRecord>> {
+    ) -> impl Future<Output = Option<Self::ReadRecord>> + Send {
         async move {
             sqlx::query_as(&format!(
                 "SELECT * FROM {}.{} WHERE {} = #1",
@@ -62,15 +62,15 @@ pub trait ReadRelation: Relation {
     fn query_one_handler<I: IdParameter, S: DatabaseState>(
         state: State<Arc<S>>,
         Query(id_param): Query<I>,
-    ) -> impl Future<Output = Json<Option<Self::ReadRecord>>> {
-        async move { Json(Self::query_one(&state.get_database(), id_param).await) }
+    ) -> impl Future<Output = Json<Option<Self::ReadRecord>>> + Send {
+        async move { Json(Self::query_one(state.get_database(), id_param).await) }
     }
 
     /// Query (select) all records for this relation from the database.
     ///
     /// This is the standard version of this method and should not be used as an Axum route handler.
     /// For the handler method, use [`ReadRelation::query_all_handler()`].
-    fn query_all(database: &PgDatabase) -> impl Future<Output = Self> {
+    fn query_all(database: &PgDatabase) -> impl Future<Output = Self> + Send {
         async move {
             Self::with_records(
                 sqlx::query_as(&format!(
@@ -92,8 +92,8 @@ pub trait ReadRelation: Relation {
     /// called outside of an Axum context, see [`ReadRelation::query_all()`].
     fn query_all_handler<S: DatabaseState>(
         state: State<Arc<S>>,
-    ) -> impl Future<Output = Json<Self>> {
-        async move { Json(Self::query_all(&state.get_database()).await) }
+    ) -> impl Future<Output = Json<Self>> + Send {
+        async move { Json(Self::query_all(state.get_database()).await) }
     }
 }
 
