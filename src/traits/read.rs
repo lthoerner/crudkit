@@ -40,7 +40,7 @@ pub trait ReadRelation: Relation {
     ) -> impl Future<Output = Option<Self::ReadRecord>> + Send {
         async move {
             sqlx::query_as(&format!(
-                "SELECT * FROM {}.{} WHERE {} = #1",
+                "SELECT * FROM {}.{} WHERE {} = $1",
                 Self::SCHEMA_NAME,
                 Self::RELATION_NAME,
                 Self::PRIMARY_KEY,

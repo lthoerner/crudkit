@@ -1,2 +1,3 @@
 /target
 /crudkit-derive/target/
+.env
