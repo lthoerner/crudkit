@@ -513,6 +513,7 @@ fn field_name_string(field: &Field) -> String {
         .to_owned()
 }
 
+#[allow(dead_code)]
 fn prefix_ident(ident: &Ident, prefix: &str) -> Ident {
     Ident::new(&format!("{}{}", prefix, ident), ident.span())
 }
@@ -521,6 +522,7 @@ fn suffix_ident(ident: &Ident, suffix: &str) -> Ident {
     Ident::new(&format!("{}{}", ident, suffix), ident.span())
 }
 
+#[allow(dead_code)]
 fn trim_ident_prefix(ident: &Ident, prefix: &str) -> Ident {
     Ident::new(
         ident.clone().to_string().trim_start_matches(prefix),
