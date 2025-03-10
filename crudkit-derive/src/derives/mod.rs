@@ -1,1 +1,1 @@
-pub(crate) mod derive_functions;
+pub mod derive_functions;

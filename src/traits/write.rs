@@ -43,7 +43,7 @@ pub trait WriteRelation: Relation {
     fn create_one(
         database: &PgDatabase,
         create_params: <Self::WriteRecord as WriteRecord>::CreateQueryParameters,
-    ) -> impl Future<Output = ()> {
+    ) -> impl Future<Output = ()> + Send {
         async { create_params.into().insert(database).await }
     }
 
@@ -58,9 +58,9 @@ pub trait WriteRelation: Relation {
     fn create_one_handler<S: DatabaseState>(
         state: State<Arc<S>>,
         Query(create_params): Query<<Self::WriteRecord as WriteRecord>::CreateQueryParameters>,
-    ) -> impl Future<Output = StatusCode> {
+    ) -> impl Future<Output = StatusCode> + Send {
         async move {
-            Self::create_one(&state.get_database(), create_params).await;
+            Self::create_one(state.get_database(), create_params).await;
             StatusCode::CREATED
         }
     }
@@ -68,16 +68,16 @@ pub trait WriteRelation: Relation {
     fn update_one(
         database: &PgDatabase,
         update_params: <Self::WriteRecord as WriteRecord>::UpdateQueryParameters,
-    ) -> impl Future<Output = ()> {
+    ) -> impl Future<Output = ()> + Send {
         <Self::WriteRecord as WriteRecord>::update_one(database, update_params)
     }
 
     fn update_one_handler<S: DatabaseState>(
         state: State<Arc<S>>,
         Query(update_params): Query<<Self::WriteRecord as WriteRecord>::UpdateQueryParameters>,
-    ) -> impl Future<Output = StatusCode> {
+    ) -> impl Future<Output = StatusCode> + Send {
         async move {
-            Self::update_one(&state.get_database(), update_params).await;
+            Self::update_one(state.get_database(), update_params).await;
             StatusCode::OK
         }
     }
@@ -90,7 +90,10 @@ pub trait WriteRelation: Relation {
     /// This is the standard version of this method and should not be used as an Axum route handler.
     /// For the handler method, use [`WriteRelation::delete_one_handler()`].
     // TODO: Return a more useful value for error handling
-    fn delete_one<I: IdParameter>(database: &PgDatabase, id: I) -> impl Future<Output = bool> {
+    fn delete_one<I: IdParameter>(
+        database: &PgDatabase,
+        id: I,
+    ) -> impl Future<Output = bool> + Send {
         async move {
             sqlx::query(&format!(
                 "DELETE FROM {}.{} WHERE {} = $1",
@@ -115,8 +118,8 @@ pub trait WriteRelation: Relation {
     fn delete_one_handler<I: IdParameter, S: DatabaseState>(
         state: State<Arc<S>>,
         Query(id_param): Query<I>,
-    ) -> impl Future<Output = Json<bool>> {
-        async move { Json(Self::delete_one(&state.get_database(), id_param).await) }
+    ) -> impl Future<Output = Json<bool>> + Send {
+        async move { Json(Self::delete_one(state.get_database(), id_param).await) }
     }
 
     /// Delete all records for this relation from the database.
@@ -126,7 +129,7 @@ pub trait WriteRelation: Relation {
     ///
     /// This is the standard version of this method and should not be used as an Axum route handler.
     /// For the handler method, use [`WriteRelation::delete_all_handler()`].
-    fn delete_all(database: &PgDatabase) -> impl Future<Output = bool> {
+    fn delete_all(database: &PgDatabase) -> impl Future<Output = bool> + Send {
         async move {
             sqlx::query(&format!(
                 "DELETE FROM {}.{}",
@@ -148,8 +151,8 @@ pub trait WriteRelation: Relation {
     /// called outside of an Axum context, see [`WriteRelation::delete_all()`].
     fn delete_all_handler<S: DatabaseState>(
         state: State<Arc<S>>,
-    ) -> impl Future<Output = Json<bool>> {
-        async move { Json(Self::delete_all(&state.get_database()).await) }
+    ) -> impl Future<Output = Json<bool>> + Send {
+        async move { Json(Self::delete_all(state.get_database()).await) }
     }
 }
 
@@ -178,16 +181,18 @@ pub trait WriteRecord: Record<Relation: WriteRelation> + SingleInsert {
     /// A type used for deserializing the query parameters in a request to a CREATE endpoint, which
     /// includes all of the table's columns as fields except ID fields that are auto-generated in
     /// the database.
-    type CreateQueryParameters: Into<Self>;
+    type CreateQueryParameters: Into<Self> + Send + Sync;
     /// A type used for deserializing the query parameters in a request to an UPDATE endpoint, which
     /// includes all of the table's columns as optional fields except ID fields that must be
     /// specified for the database to determine which record to update.
-    type UpdateQueryParameters;
+    type UpdateQueryParameters: Send + Sync;
 
+    // * This has to be in `WriteRecord` because the `WriteRelation` derive does not have access to
+    // * the field names and primary keys of the record type at compile time
     fn update_one(
         database: &PgDatabase,
         update_params: Self::UpdateQueryParameters,
-    ) -> impl Future<Output = ()>;
+    ) -> impl Future<Output = ()> + Send;
 }
 
 /// A trait that allows a single record to be inserted to the database.
@@ -222,11 +227,15 @@ pub trait SingleInsert: Record {
     /// This should not be used repeatedly for a collection of records. Inserting multiple records
     /// can be done much more efficiently using [`BulkInsert::insert_all`], which should be
     /// implemented for any database table type.
-    fn insert(self, database: &PgDatabase) -> impl Future<Output = ()> {
+    fn insert(self, database: &PgDatabase) -> impl Future<Output = ()> + Send {
         async move {
             let mut query_builder = Self::get_query_builder();
             query_builder.push_values(std::iter::once(self), Self::push_column_bindings);
-            database.execute_query_builder(query_builder).await;
+            query_builder
+                .build()
+                .execute(&database.connection)
+                .await
+                .unwrap();
         }
     }
 }
@@ -252,7 +261,7 @@ pub trait BulkInsert: WriteRelation<Record: SingleInsert> {
     /// Convert a table of records into a series of batches to be inserted to the database.
     ///
     /// This method should only be used within auto-implementations.
-    fn into_chunks(self) -> impl Iterator<Item = Vec<Self::Record>> {
+    fn into_chunks(self) -> impl Iterator<Item = Vec<Self::Record>> + Send + Sync {
         let mut iter = self.take_records().into_iter();
         // TODO: Annotate this code or something, I have very little idea what it does
         // * This was done because `itertools::IntoChunks` was causing issues with the axum handlers
@@ -264,12 +273,13 @@ pub trait BulkInsert: WriteRelation<Record: SingleInsert> {
     ///
     /// This can insert tables of arbitrary size, but each batch is limited in size by number of
     /// parameters (table column count * record count).
-    fn insert_all(self, database: &PgDatabase) -> impl Future<Output = ()> {
+    fn insert_all(self, database: &PgDatabase) -> impl Future<Output = ()> + Send {
         async move {
             for chunk in self.into_chunks() {
                 let mut query_builder = Self::Record::get_query_builder();
                 query_builder.push_values(chunk, Self::Record::push_column_bindings);
-                database.execute_query_builder(query_builder).await;
+                // TODO: Error handling
+                let _ = query_builder.build().execute(&database.connection).await;
             }
         }
     }
