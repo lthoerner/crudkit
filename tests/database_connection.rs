@@ -1,4 +1,4 @@
-use std::{env, future::Future};
+use std::env;
 
 use crudkit::database::PgDatabase;
 use sqlx::{Connection, PgConnection};
@@ -15,13 +15,11 @@ pub fn get_database_connection_string() -> String {
     connection_string
 }
 
-pub fn get_database() -> impl Future<Output = PgDatabase> {
-    async {
-        PgDatabase {
-            connection: sqlx::PgPool::connect(&get_database_connection_string())
-                .await
-                .unwrap(),
-        }
+pub async fn get_database() -> PgDatabase {
+    PgDatabase {
+        connection: sqlx::PgPool::connect(&get_database_connection_string())
+            .await
+            .unwrap(),
     }
 }
 

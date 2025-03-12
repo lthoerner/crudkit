@@ -49,7 +49,7 @@ async fn insert_query_one_and_delete_one_should_work() {
 
     new_record.insert(&database).await;
 
-    let record = CustomersTable::query_one(&database, id_parameter)
+    let record = CustomersTable::query_one(&database, id_parameter.clone())
         .await
         .expect("query to contain record");
 
