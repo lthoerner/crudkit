@@ -221,7 +221,7 @@ Run tests with `cargo test`.
 
 We request that contributors ensure their code passes the test suite before publishing a final PR.
 
-#### Environment variables
+#### Environment Variables
 Some integration tests for CRUDkit require a database (more on this below), these integration tests
 also require certain environment variables to be set in order to connect to the database. These
 variables can be read from your environment or from a `.env` file in the root of the repository. The
@@ -237,7 +237,7 @@ Although not required it is also recommended that you change the superuser passw
 
     SUPERUSER_PWD=password
 
-#### Creating a test database
+#### Creating a Test Database
 Some integration tests for CRUDkit require a database, follow these instructions to create a local
 database for local testing. Note that these instructions use Bash shell scripts, if you are running
 Windows it is recommended to use the Windows Subsystem for Linux (WSL) to run the scripts.
