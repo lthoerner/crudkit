@@ -58,10 +58,12 @@ chat with other Rust developers about projects you're working on, and to get hel
 The specific areas you should focus on for use in this project are going to be
 [traits](https://doc.rust-lang.org/book/ch10-02-traits.html) and
 [derive macros](https://doc.rust-lang.org/book/ch19-06-macros.html). These are covered in the Rust
-book, but not very in-depth. There are a few good video resources on the subject, and in regard to
-derive macros, I personally learned from these videos:
+book, but not very in-depth. I've listed some video resources about derive macros below; I
+personally learned from the first two videos in the list. The third is actually a presentation I
+gave about implementing derive macros.
 - [*A Practical Introduction to Derive Macros in Rust* - Schrödinger's Watermelon](https://youtu.be/XY0yR6IPbhw)
 - [*A Practical Introduction to Derive Macros with Attributes* - Schrödinger's Watermelon](https://youtu.be/GFijwucFJqw)
+- [*Derive Macros, Or How I Learned to Stop Worrying and Love the `proc_macro2::TokenStream`*](https://youtu.be/ALZr9BwWHQU)
 
 If you are entirely new to programming, we absolutely welcome you to involve yourself in discussions
 about the project if you would like. That being said, this is most likely not a good first project
