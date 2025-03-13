@@ -65,6 +65,14 @@ pub trait WriteRelation: Relation {
         }
     }
 
+    /// Update a single record in the database.
+    ///
+    /// In the future, this will return a proper status code. At the moment, it just returns a
+    /// placeholder status code because the underlying [`WriteRecord::update_one()`] does not
+    /// implement error handling.
+    ///
+    /// This is the standard version of this method and should not be used as an Axum route handler.
+    /// For the handler method, use [`WriteRelation::update_one_handler()`].
     fn update_one(
         database: &PgDatabase,
         update_params: <Self::WriteRecord as WriteRecord>::UpdateQueryParameters,
@@ -72,6 +80,14 @@ pub trait WriteRelation: Relation {
         <Self::WriteRecord as WriteRecord>::update_one(database, update_params)
     }
 
+    /// Update a single record in the database.
+    ///
+    /// In the future, this will return a proper status code. At the moment, it just returns a
+    /// placeholder status code because the underlying [`WriteRecord::update_one()`] does not
+    /// implement error handling.
+    ///
+    /// This is the Axum route handler version of this method. For the standard method, which can be
+    /// called outside of an Axum context, see [`WriteRelation::update_one()`].
     fn update_one_handler<S: DatabaseState>(
         state: State<Arc<S>>,
         Query(update_params): Query<<Self::WriteRecord as WriteRecord>::UpdateQueryParameters>,
@@ -187,8 +203,13 @@ pub trait WriteRecord: Record<Relation: WriteRelation> + SingleInsert {
     /// specified for the database to determine which record to update.
     type UpdateQueryParameters: Send + Sync;
 
-    // * This has to be in `WriteRecord` because the `WriteRelation` derive does not have access to
-    // * the field names and primary keys of the record type at compile time
+    /// Update a single record in the database.
+    ///
+    /// This method is used by [`WriteRelation::update_one()`] because the [`WriteRelation`] derive
+    /// macro does not have access to the field names and primary keys of the record type, which it
+    /// would need to generate this implementation. In the future, this will likely be fixed by
+    /// using a module-wide macro rather than multiple type-level macros. For now, it is recommended
+    /// to use [`WriteRelation`]'s version of these methods.
     fn update_one(
         database: &PgDatabase,
         update_params: Self::UpdateQueryParameters,
