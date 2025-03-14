@@ -7,12 +7,13 @@ use crudkit::{
     traits::{
         id_parameter::{GenericIdParameter, IdParameter},
         read::ReadRelation,
-        write::{SingleInsert, WriteRelation},
+        write::{BulkInsert, SingleInsert, WriteRelation},
     },
     BulkInsert, IdentifiableRecord, ReadRecord, ReadRelation, Record, Relation, SingleInsert,
     WriteRecord, WriteRelation,
 };
 use database_connection::get_database;
+use serial_test::serial;
 
 #[derive(Relation, ReadRelation, WriteRelation, BulkInsert, Clone)]
 #[relation(relation_name = "customers", primary_key = "id")]
@@ -34,6 +35,7 @@ pub struct CustomersTableRecord {
 }
 
 #[tokio::test]
+#[serial(customers_table)]
 async fn insert_query_one_and_delete_one_should_work() {
     let id = 1;
     let id_parameter = GenericIdParameter::new(id);
@@ -57,4 +59,33 @@ async fn insert_query_one_and_delete_one_should_work() {
     assert_eq!(record.name, "John Doe".to_string());
 
     CustomersTable::delete_one(&database, id_parameter).await;
+}
+
+#[tokio::test]
+#[serial(customers_table)]
+async fn bulk_insert_query_all_and_delete_all_should_work() {
+    let customers = (0..10)
+        .map(|i| CustomersTableRecord {
+            id: Some(i),
+            name: format!("John Doe {i}").to_string(),
+            email_address: Some("jdoe@email.com".to_string()),
+            phone_number: Some("1234567890".to_string()),
+            street_address: Some("123 Some street East".to_string()),
+        })
+        .collect();
+    let customers_table = CustomersTable { records: customers };
+
+    let database = get_database().await;
+
+    customers_table.insert_all(&database).await;
+
+    let records = CustomersTable::query_all(&database).await.records;
+
+    assert_eq!(records.len(), 10);
+    assert_eq!(records[0].id, Some(0));
+    assert_eq!(records[0].name, "John Doe 0".to_string());
+    assert_eq!(records[9].id, Some(9));
+    assert_eq!(records[9].name, "John Doe 9".to_string());
+
+    CustomersTable::delete_all(&database).await;
 }

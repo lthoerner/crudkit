@@ -16,4 +16,5 @@ serde = { version = "1.0.218", features = ["derive"] }
 [dev-dependencies]
 dotenvy = "0.15.7"
 serde = { version = "1.0.218", features = ["derive"] }
+serial_test = "3.2.0"
 tokio = { version = "1.43.0", features = ["full"] }
