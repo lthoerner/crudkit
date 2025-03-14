@@ -324,7 +324,7 @@ pub fn derive_write_record(input: TokenStream2) -> SynResult<TokenStream2> {
             async fn update_one(
                 database: &crudkit::database::PgDatabase,
                 update_params: Self::UpdateQueryParameters,
-            ) {
+            ) -> Result<(), crudkit::error::Error> {
                 let #update_params_type_name {
                     #(
                         #type_field_idents
@@ -355,7 +355,12 @@ pub fn derive_write_record(input: TokenStream2) -> SynResult<TokenStream2> {
                 )*
 
                 if !column_bind_specifiers.is_empty() {
-                    query.execute(&database.connection).await.unwrap();
+                    match query.execute(&database.connection).await {
+                        Ok(_) => Ok(()),
+                        Err(e) => Err(crudkit::error::Error::from(e)),
+                    }
+                } else {
+                    Err(crudkit::error::Error::InvalidQuery)
                 }
             }
         }

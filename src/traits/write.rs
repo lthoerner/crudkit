@@ -1,7 +1,7 @@
 use std::future::Future;
 use std::sync::Arc;
 
-use axum::extract::{Json, Query, State};
+use axum::extract::{Query, State};
 use http::StatusCode;
 use sqlx::query_builder::{QueryBuilder, Separated};
 use sqlx::Postgres;
@@ -11,6 +11,7 @@ use super::id_parameter::IdParameter;
 use super::read::{ReadRecord, ReadRelation};
 use super::shared::{Record, Relation};
 use crate::database::{DatabaseState, PgDatabase, SQL_PARAMETER_BIND_LIMIT};
+use crate::error::{Error as CrudkitError, Result as CrudkitResult};
 
 /// A trait that enables writable tables to have their records modified in the database.
 ///
@@ -43,7 +44,7 @@ pub trait WriteRelation: Relation {
     fn create_one(
         database: &PgDatabase,
         create_params: <Self::WriteRecord as WriteRecord>::CreateQueryParameters,
-    ) -> impl Future<Output = ()> + Send {
+    ) -> impl Future<Output = CrudkitResult<()>> + Send {
         async { create_params.into().insert(database).await }
     }
 
@@ -60,8 +61,10 @@ pub trait WriteRelation: Relation {
         Query(create_params): Query<<Self::WriteRecord as WriteRecord>::CreateQueryParameters>,
     ) -> impl Future<Output = StatusCode> + Send {
         async move {
-            Self::create_one(state.get_database(), create_params).await;
-            StatusCode::CREATED
+            match Self::create_one(state.get_database(), create_params).await {
+                Ok(_) => StatusCode::CREATED,
+                Err(e) => StatusCode::from(e),
+            }
         }
     }
 
@@ -76,7 +79,7 @@ pub trait WriteRelation: Relation {
     fn update_one(
         database: &PgDatabase,
         update_params: <Self::WriteRecord as WriteRecord>::UpdateQueryParameters,
-    ) -> impl Future<Output = ()> + Send {
+    ) -> impl Future<Output = CrudkitResult<()>> + Send {
         <Self::WriteRecord as WriteRecord>::update_one(database, update_params)
     }
 
@@ -93,8 +96,10 @@ pub trait WriteRelation: Relation {
         Query(update_params): Query<<Self::WriteRecord as WriteRecord>::UpdateQueryParameters>,
     ) -> impl Future<Output = StatusCode> + Send {
         async move {
-            Self::update_one(state.get_database(), update_params).await;
-            StatusCode::OK
+            match Self::update_one(state.get_database(), update_params).await {
+                Ok(_) => StatusCode::OK,
+                Err(e) => StatusCode::from(e),
+            }
         }
     }
 
@@ -105,13 +110,12 @@ pub trait WriteRelation: Relation {
     ///
     /// This is the standard version of this method and should not be used as an Axum route handler.
     /// For the handler method, use [`WriteRelation::delete_one_handler()`].
-    // TODO: Return a more useful value for error handling
     fn delete_one<I: IdParameter>(
         database: &PgDatabase,
         id: I,
-    ) -> impl Future<Output = bool> + Send {
+    ) -> impl Future<Output = CrudkitResult<()>> + Send {
         async move {
-            sqlx::query(&format!(
+            match sqlx::query(&format!(
                 "DELETE FROM {}.{} WHERE {} = $1",
                 Self::SCHEMA_NAME,
                 Self::RELATION_NAME,
@@ -120,7 +124,10 @@ pub trait WriteRelation: Relation {
             .bind(id.id() as i32)
             .execute(&database.connection)
             .await
-            .is_ok()
+            {
+                Ok(_) => Ok(()),
+                Err(e) => Err(CrudkitError::from(e)),
+            }
         }
     }
 
@@ -134,8 +141,13 @@ pub trait WriteRelation: Relation {
     fn delete_one_handler<I: IdParameter, S: DatabaseState>(
         state: State<Arc<S>>,
         Query(id_param): Query<I>,
-    ) -> impl Future<Output = Json<bool>> + Send {
-        async move { Json(Self::delete_one(state.get_database(), id_param).await) }
+    ) -> impl Future<Output = StatusCode> + Send {
+        async move {
+            match Self::delete_one(state.get_database(), id_param).await {
+                Ok(_) => StatusCode::OK,
+                Err(e) => StatusCode::from(e),
+            }
+        }
     }
 
     /// Delete all records for this relation from the database.
@@ -145,16 +157,19 @@ pub trait WriteRelation: Relation {
     ///
     /// This is the standard version of this method and should not be used as an Axum route handler.
     /// For the handler method, use [`WriteRelation::delete_all_handler()`].
-    fn delete_all(database: &PgDatabase) -> impl Future<Output = bool> + Send {
+    fn delete_all(database: &PgDatabase) -> impl Future<Output = CrudkitResult<()>> + Send {
         async move {
-            sqlx::query(&format!(
+            match sqlx::query(&format!(
                 "DELETE FROM {}.{}",
                 Self::SCHEMA_NAME,
                 Self::RELATION_NAME,
             ))
             .execute(&database.connection)
             .await
-            .is_ok()
+            {
+                Ok(_) => Ok(()),
+                Err(e) => Err(CrudkitError::from(e)),
+            }
         }
     }
 
@@ -167,8 +182,13 @@ pub trait WriteRelation: Relation {
     /// called outside of an Axum context, see [`WriteRelation::delete_all()`].
     fn delete_all_handler<S: DatabaseState>(
         state: State<Arc<S>>,
-    ) -> impl Future<Output = Json<bool>> + Send {
-        async move { Json(Self::delete_all(state.get_database()).await) }
+    ) -> impl Future<Output = StatusCode> + Send {
+        async move {
+            match Self::delete_all(state.get_database()).await {
+                Ok(_) => StatusCode::OK,
+                Err(e) => StatusCode::from(e),
+            }
+        }
     }
 }
 
@@ -213,7 +233,7 @@ pub trait WriteRecord: Record<Relation: WriteRelation> + SingleInsert {
     fn update_one(
         database: &PgDatabase,
         update_params: Self::UpdateQueryParameters,
-    ) -> impl Future<Output = ()> + Send;
+    ) -> impl Future<Output = CrudkitResult<()>> + Send;
 }
 
 /// A trait that allows a single record to be inserted to the database.
@@ -248,15 +268,14 @@ pub trait SingleInsert: Record {
     /// This should not be used repeatedly for a collection of records. Inserting multiple records
     /// can be done much more efficiently using [`BulkInsert::insert_all`], which should be
     /// implemented for any database table type.
-    fn insert(self, database: &PgDatabase) -> impl Future<Output = ()> + Send {
+    fn insert(self, database: &PgDatabase) -> impl Future<Output = CrudkitResult<()>> + Send {
         async move {
             let mut query_builder = Self::get_query_builder();
             query_builder.push_values(std::iter::once(self), Self::push_column_bindings);
-            query_builder
-                .build()
-                .execute(&database.connection)
-                .await
-                .unwrap();
+            match query_builder.build().execute(&database.connection).await {
+                Ok(_) => Ok(()),
+                Err(e) => Err(CrudkitError::from(e)),
+            }
         }
     }
 }
@@ -294,14 +313,17 @@ pub trait BulkInsert: WriteRelation<Record: SingleInsert> {
     ///
     /// This can insert tables of arbitrary size, but each batch is limited in size by number of
     /// parameters (table column count * record count).
-    fn insert_all(self, database: &PgDatabase) -> impl Future<Output = ()> + Send {
+    fn insert_all(self, database: &PgDatabase) -> impl Future<Output = CrudkitResult<()>> + Send {
         async move {
             for chunk in self.into_chunks() {
                 let mut query_builder = Self::Record::get_query_builder();
                 query_builder.push_values(chunk, Self::Record::push_column_bindings);
-                // TODO: Error handling
-                let _ = query_builder.build().execute(&database.connection).await;
+                if let Err(e) = query_builder.build().execute(&database.connection).await {
+                    return Err(CrudkitError::from(e));
+                }
             }
+
+            Ok(())
         }
     }
 }
