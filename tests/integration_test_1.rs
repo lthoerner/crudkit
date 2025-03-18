@@ -3,6 +3,8 @@
 #[path = "./database_connection.rs"]
 mod database_connection;
 
+use serde::Serialize;
+
 use crudkit::{
     traits::{
         id_parameter::{GenericIdParameter, IdParameter},
@@ -15,14 +17,21 @@ use crudkit::{
 use database_connection::get_database;
 use serial_test::serial;
 
-#[derive(Relation, ReadRelation, WriteRelation, BulkInsert, Clone)]
+#[derive(Relation, ReadRelation, WriteRelation, BulkInsert, Clone, Serialize)]
 #[relation(relation_name = "customers", primary_key = "id")]
 pub struct CustomersTable {
     records: Vec<CustomersTableRecord>,
 }
 
 #[derive(
-    Record, ReadRecord, WriteRecord, SingleInsert, IdentifiableRecord, sqlx::FromRow, Clone,
+    Record,
+    ReadRecord,
+    WriteRecord,
+    SingleInsert,
+    IdentifiableRecord,
+    sqlx::FromRow,
+    Clone,
+    Serialize,
 )]
 pub struct CustomersTableRecord {
     #[auto_primary_key]
