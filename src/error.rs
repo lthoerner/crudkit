@@ -3,15 +3,21 @@ use sqlx::Error as SqlxError;
 
 pub(crate) type Result<T> = core::result::Result<T, Error>;
 
-pub enum Error {
+pub struct Error {
+    pub kind: ErrorKind,
+    pub source: SqlxError,
+    status_code: StatusCode,
+}
+
+pub enum ErrorKind {
     BrokenDatabaseConnection,
     InvalidQuery,
     UnexpectedQueryResult,
 }
 
 impl From<SqlxError> for Error {
-    fn from(value: SqlxError) -> Self {
-        match value {
+    fn from(source_error: SqlxError) -> Self {
+        match &source_error {
             SqlxError::Configuration(_)
             | SqlxError::Io(_)
             | SqlxError::Tls(_)
@@ -20,24 +26,36 @@ impl From<SqlxError> for Error {
             | SqlxError::PoolTimedOut
             | SqlxError::PoolClosed
             | SqlxError::WorkerCrashed
-            | SqlxError::Database(_) => Self::BrokenDatabaseConnection,
+            | SqlxError::Database(_) => Self {
+                kind: ErrorKind::BrokenDatabaseConnection,
+                source: source_error,
+                status_code: StatusCode::INTERNAL_SERVER_ERROR,
+            },
             SqlxError::TypeNotFound { .. }
             | SqlxError::ColumnIndexOutOfBounds { .. }
             | SqlxError::ColumnNotFound(_)
-            | SqlxError::Encode(_) => Self::InvalidQuery,
-            SqlxError::RowNotFound | SqlxError::Decode(_) => Self::UnexpectedQueryResult,
+            | SqlxError::Encode(_) => Self {
+                kind: ErrorKind::InvalidQuery,
+                source: source_error,
+                status_code: StatusCode::BAD_REQUEST,
+            },
+            SqlxError::RowNotFound => Self {
+                kind: ErrorKind::UnexpectedQueryResult,
+                source: source_error,
+                status_code: StatusCode::NOT_FOUND,
+            },
+            SqlxError::Decode(_) => Self {
+                kind: ErrorKind::UnexpectedQueryResult,
+                source: source_error,
+                status_code: StatusCode::INTERNAL_SERVER_ERROR,
+            },
             _ => todo!(),
         }
     }
 }
 
 impl From<Error> for StatusCode {
-    fn from(value: Error) -> Self {
-        match value {
-            Error::BrokenDatabaseConnection | Error::UnexpectedQueryResult => {
-                StatusCode::INTERNAL_SERVER_ERROR
-            }
-            Error::InvalidQuery => StatusCode::BAD_REQUEST,
-        }
+    fn from(error: Error) -> Self {
+        error.status_code
     }
 }
