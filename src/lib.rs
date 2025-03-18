@@ -3,3 +3,4 @@ pub mod error;
 pub mod traits;
 
 pub use crudkit_derive::*;
+pub use http;

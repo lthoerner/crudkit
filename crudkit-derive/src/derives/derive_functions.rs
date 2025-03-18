@@ -360,7 +360,11 @@ pub fn derive_write_record(input: TokenStream2) -> SynResult<TokenStream2> {
                         Err(e) => Err(crudkit::error::Error::from(e)),
                     }
                 } else {
-                    Err(crudkit::error::Error::InvalidQuery)
+                    Err(crudkit::error::Error {
+                        kind: crudkit::error::ErrorKind::InvalidQuery,
+                        source: None,
+                        status_code: crudkit::http::StatusCode::NOT_FOUND,
+                    })
                 }
             }
         }
