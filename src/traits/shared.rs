@@ -1,4 +1,5 @@
 use rand::{rng, Rng};
+use serde::Serialize;
 use sqlx::postgres::PgRow;
 
 #[allow(unused_imports)]
@@ -13,7 +14,7 @@ use super::write::{WriteRecord, WriteRelation};
 /// derived, particularly [`ReadRelation`], [`WriteRelation`], [`ReadRecord`], and [`WriteRecord`].
 ///
 /// Also see [`Record`].
-pub trait Relation: Sized + Send + Sync {
+pub trait Relation: Serialize + Sized + Send + Sync {
     /// The record type which this relation contains a collection of.
     ///
     /// This type and the [`Record::Relation`] type are directly interreferential to allow
@@ -67,7 +68,9 @@ pub trait Relation: Sized + Send + Sync {
 /// derived, particularly [`ReadRelation`], [`WriteRelation`], [`ReadRecord`], and [`WriteRecord`].
 ///
 /// Also see [`Relation`].
-pub trait Record: for<'a> sqlx::FromRow<'a, PgRow> + Send + Sync + Unpin + Clone {
+pub trait Record:
+    Serialize + for<'a> sqlx::FromRow<'a, PgRow> + Send + Sync + Unpin + Clone
+{
     /// The relation type which contains a collection of this record type.
     ///
     /// This type and the [`Relation::Record`] type are directly interreferential to allow

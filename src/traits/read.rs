@@ -2,12 +2,15 @@ use std::future::Future;
 use std::sync::Arc;
 
 use axum::extract::{Json, Query, State};
+use axum::response::{IntoResponse, Response};
+use http::StatusCode;
 
 use super::id_parameter::IdParameter;
 use super::shared::{Record, Relation};
 #[allow(unused_imports)]
 use super::write::{WriteRecord, WriteRelation};
 use crate::database::{DatabaseState, PgDatabase};
+use crate::error::{Error as CrudkitError, Result as CrudkitResult};
 
 /// A trait that enables readable tables and views to have their records queried from the database.
 ///
@@ -37,9 +40,9 @@ pub trait ReadRelation: Relation {
     fn query_one<I: IdParameter>(
         database: &PgDatabase,
         id: I,
-    ) -> impl Future<Output = Option<Self::ReadRecord>> + Send {
+    ) -> impl Future<Output = CrudkitResult<Self::ReadRecord>> + Send {
         async move {
-            sqlx::query_as(&format!(
+            match sqlx::query_as(&format!(
                 "SELECT * FROM {}.{} WHERE {} = $1",
                 Self::SCHEMA_NAME,
                 Self::RELATION_NAME,
@@ -48,7 +51,10 @@ pub trait ReadRelation: Relation {
             .bind(id.id() as i32)
             .fetch_one(&database.connection)
             .await
-            .ok()
+            {
+                Ok(record) => Ok(record),
+                Err(e) => Err(CrudkitError::from(e)),
+            }
         }
     }
 
@@ -62,27 +68,33 @@ pub trait ReadRelation: Relation {
     fn query_one_handler<I: IdParameter, S: DatabaseState>(
         state: State<Arc<S>>,
         Query(id_param): Query<I>,
-    ) -> impl Future<Output = Json<Option<Self::ReadRecord>>> + Send {
-        async move { Json(Self::query_one(state.get_database(), id_param).await) }
+    ) -> impl Future<Output = Response> + Send {
+        async move {
+            match Self::query_one(state.get_database(), id_param).await {
+                Ok(record) => Json(record).into_response(),
+                Err(e) => StatusCode::from(e).into_response(),
+            }
+        }
     }
 
     /// Query (select) all records for this relation from the database.
     ///
     /// This is the standard version of this method and should not be used as an Axum route handler.
     /// For the handler method, use [`ReadRelation::query_all_handler()`].
-    fn query_all(database: &PgDatabase) -> impl Future<Output = Self> + Send {
+    fn query_all(database: &PgDatabase) -> impl Future<Output = CrudkitResult<Self>> + Send {
         async move {
-            Self::with_records(
-                sqlx::query_as(&format!(
-                    "SELECT * FROM {}.{} ORDER BY {}",
-                    Self::SCHEMA_NAME,
-                    Self::RELATION_NAME,
-                    Self::PRIMARY_KEY,
-                ))
-                .fetch_all(&database.connection)
-                .await
-                .unwrap(),
-            )
+            match sqlx::query_as(&format!(
+                "SELECT * FROM {}.{} ORDER BY {}",
+                Self::SCHEMA_NAME,
+                Self::RELATION_NAME,
+                Self::PRIMARY_KEY,
+            ))
+            .fetch_all(&database.connection)
+            .await
+            {
+                Ok(records) => Ok(Self::with_records(records)),
+                Err(e) => Err(CrudkitError::from(e)),
+            }
         }
     }
 
@@ -92,8 +104,13 @@ pub trait ReadRelation: Relation {
     /// called outside of an Axum context, see [`ReadRelation::query_all()`].
     fn query_all_handler<S: DatabaseState>(
         state: State<Arc<S>>,
-    ) -> impl Future<Output = Json<Self>> + Send {
-        async move { Json(Self::query_all(state.get_database()).await) }
+    ) -> impl Future<Output = Response> + Send {
+        async move {
+            match Self::query_all(state.get_database()).await {
+                Ok(records) => Json(records).into_response(),
+                Err(e) => StatusCode::from(e).into_response(),
+            }
+        }
     }
 }
 
