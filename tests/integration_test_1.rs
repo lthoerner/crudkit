@@ -58,16 +58,21 @@ async fn insert_query_one_and_delete_one_should_work() {
 
     let database = get_database().await;
 
-    new_record.insert(&database).await;
+    new_record
+        .insert(&database)
+        .await
+        .expect("customers record creation failed");
 
     let record = CustomersTable::query_one(&database, id_parameter.clone())
         .await
-        .expect("query to contain record");
+        .expect("customers record query failed");
 
     assert_eq!(record.id, Some(id as i32));
     assert_eq!(record.name, "John Doe".to_string());
 
-    CustomersTable::delete_one(&database, id_parameter).await;
+    CustomersTable::delete_one(&database, id_parameter)
+        .await
+        .expect("customers record deletion failed");
 }
 
 #[tokio::test]
@@ -85,11 +90,14 @@ async fn update_one_should_work() {
 
     let database = get_database().await;
 
-    new_record.insert(&database).await;
+    new_record
+        .insert(&database)
+        .await
+        .expect("customers record creation failed");
 
     let record = CustomersTable::query_one(&database, id_parameter.clone())
         .await
-        .expect("query to contain record");
+        .expect("customers record query failed");
 
     assert_eq!(record.id, Some(id as i32));
     assert_eq!(record.name, "Jane Doe".to_string());
@@ -104,11 +112,13 @@ async fn update_one_should_work() {
         phone_number: Some(Some("1234567890".to_string())), // Add value
         street_address: Some(Some("123 Some street East".to_string())), // Add value
     };
-    CustomersTable::update_one(&database, updated_record).await;
+    CustomersTable::update_one(&database, updated_record)
+        .await
+        .expect("customers record update failed");
 
     let updated_record = CustomersTable::query_one(&database, id_parameter.clone())
         .await
-        .expect("query to contain record");
+        .expect("customers record query failed");
 
     assert_eq!(updated_record.id, Some(id as i32));
     assert_eq!(updated_record.name, "Jane Doe".to_string());
@@ -119,7 +129,9 @@ async fn update_one_should_work() {
         Some("123 Some street East".to_string())
     );
 
-    CustomersTable::delete_one(&database, id_parameter).await;
+    CustomersTable::delete_one(&database, id_parameter)
+        .await
+        .expect("customers record deletion failed");
 }
 
 #[tokio::test]
@@ -138,9 +150,15 @@ async fn bulk_insert_query_all_and_delete_all_should_work() {
 
     let database = get_database().await;
 
-    customers_table.insert_all(&database).await;
+    customers_table
+        .insert_all(&database)
+        .await
+        .expect("customers table creation failed");
 
-    let records = CustomersTable::query_all(&database).await.records;
+    let records = CustomersTable::query_all(&database)
+        .await
+        .expect("customers table query failed")
+        .records;
 
     assert_eq!(records.len(), 10);
     assert_eq!(records[0].id, Some(0));
@@ -148,5 +166,7 @@ async fn bulk_insert_query_all_and_delete_all_should_work() {
     assert_eq!(records[9].id, Some(9));
     assert_eq!(records[9].name, "John Doe 9".to_string());
 
-    CustomersTable::delete_all(&database).await;
+    CustomersTable::delete_all(&database)
+        .await
+        .expect("customers table deletion failed");
 }

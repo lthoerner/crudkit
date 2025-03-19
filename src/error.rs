@@ -3,13 +3,15 @@ use sqlx::Error as SqlxError;
 
 pub(crate) type Result<T> = core::result::Result<T, Error>;
 
-// TODO: Add documentation
+// TODO: Add documentation, implement `Error` trait
+#[derive(Debug)]
 pub struct Error {
     pub kind: ErrorKind,
     pub source: Option<SqlxError>,
-    status_code: StatusCode,
+    pub status_code: StatusCode,
 }
 
+#[derive(Debug)]
 pub enum ErrorKind {
     BrokenDatabaseConnection,
     InvalidQuery,
