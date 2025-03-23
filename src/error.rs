@@ -34,11 +34,22 @@ pub struct Error {
     pub status_code: StatusCode,
 }
 
+/// A set of broad categories used by [`Error`].
+///
+/// This is not an exhaustive list and is subject to change in the future. It is meant to provide
+/// surface-level information that can be handled simply should an error need to be handled
+/// explicitly, but in most cases, errors should be propagated to the user via
+/// [`Error::status_code`].
 #[derive(Debug)]
 #[non_exhaustive]
 pub enum ErrorKind {
+    /// The database is no longer accessible because of a connection or authentication failure.
     BrokenDatabaseConnection,
+    /// The query sent to the database either was malformed/syntactically invalid or could not be
+    /// serialized.
     InvalidQuery,
+    /// The database returned an unexpected result based on the operation performed, i.e. returning
+    /// no rows when expected to return a single row.
     UnexpectedQueryResult,
 }
 
