@@ -57,11 +57,11 @@ then
 
     # Create the application user
     CREATE_QUERY="CREATE USER ${APP_USER} WITH PASSWORD '${APP_USER_PWD}';"
-    docker exec -it "${CONTAINER_NAME}" psql -U "${SUPERUSER}" -c "${CREATE_QUERY}"
+    docker exec -i "${CONTAINER_NAME}" psql -U "${SUPERUSER}" -c "${CREATE_QUERY}"
 
     # Grant create DB privileges to the app user
     GRANT_QUERY="ALTER USER ${APP_USER} CREATEDB;"
-    docker exec -it "${CONTAINER_NAME}" psql -U "${SUPERUSER}" -c "${GRANT_QUERY}"
+    docker exec -i "${CONTAINER_NAME}" psql -U "${SUPERUSER}" -c "${GRANT_QUERY}"
 fi
 
 >&2 echo "DB is up and running on port ${DB_PORT}"

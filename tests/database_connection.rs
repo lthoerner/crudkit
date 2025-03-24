@@ -4,7 +4,9 @@ use crudkit::database::PgDatabase;
 use sqlx::{Connection, PgConnection};
 
 pub fn get_database_connection_string() -> String {
-    dotenvy::dotenv().unwrap();
+    // dotenv() returns an error if a .env file is not found, we will ignore
+    // this and assume environment variables are already set
+    _ = dotenvy::dotenv();
     let db_port = env::var("DB_PORT").unwrap();
     let app_user = env::var("APP_USER").unwrap();
     let app_user_pwd = env::var("APP_USER_PWD").unwrap();
