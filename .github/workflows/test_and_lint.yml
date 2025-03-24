@@ -1,0 +1,71 @@
+name: Test & lint
+
+on: [push, pull_request]
+
+env:
+  CARGO_TERM_COLOR: always
+  SQLX_VERSION: 0.8.3
+  SQLX_FEATURES: "rustls,postgres"
+  DB_PORT: 5432
+  APP_USER: app_user
+  APP_USER_PWD: password
+  APP_DB_NAME: crudkit_test_db
+
+jobs:
+  test:
+    name: Test
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out code
+        uses: actions/checkout@v4
+
+      - name: Install the Rust toolchain
+        uses: actions-rust-lang/setup-rust-toolchain@v1
+
+      - name: Install Docker CLI
+        uses: actions-hub/docker@master
+        env:
+          SKIP_LOGIN: true
+
+      - name: Install SQLX CLI
+        run:
+          cargo install sqlx-cli
+          --version=${{ env.SQLX_VERSION }}
+          --features ${{ env.SQLX_FEATURES }}
+          --no-default-features
+
+      - name: Initialize database
+        run: ./scripts/init_db.sh
+
+      - name: Run tests
+        run: cargo test
+
+  format:
+    name: Format
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out code
+        uses: actions/checkout@v4
+
+      - name: Install the Rust toolchain
+        uses: actions-rust-lang/setup-rust-toolchain@v1
+        with:
+          components: rustfmt
+
+      - name: Check formatting
+        run: cargo fmt --check
+
+  clippy:
+    name: Clippy
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out code
+        uses: actions/checkout@v4
+
+      - name: Install the Rust toolchain
+        uses: actions-rust-lang/setup-rust-toolchain@v1
+        with:
+          components: clippy
+
+      - name: Lint with Clippy
+        run: cargo clippy -- -D warnings
