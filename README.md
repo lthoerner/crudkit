@@ -2,8 +2,9 @@
 
 # CRUDkit
 CRUDkit is a Rust crate that aims to provide a convenient framework to build CRUD application
-backends using Axum and PostgreSQL, acting as an abstraction over SQLX. In the future, it will
-likely be expanded to work with MySQL and SQLite as well.
+backends using [Axum](https://crates.io/crates/axum) and PostgreSQL, acting as an abstraction over
+[SQLX](https://crates.io/crates/sqlx). In the future, it will likely be expanded to work with MySQL
+and SQLite as well.
 
 CRUDkit lives somewhere in between a query builder and an ORM. It does not provide granular
 low-level control of SQL queries, nor does it aim to provide a type-safe implementation of SQL. It
