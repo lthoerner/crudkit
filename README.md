@@ -25,6 +25,29 @@ communicate with each other using shared data structures.
 
 > *To be expanded upon later.*
 
+## Installing CRUDkit
+Installing CRUDkit is mostly a pretty simple process, but there is one complication that you need to
+take into account. Because reexporting it breaks some derive macros, SQLx must be installed in your
+own crate in order to use CRUDkit. Additionally, it must be an identical version to the one used in
+CRUDkit.
+
+As usual, the first step of installing the crate is to `cargo add` it:
+```sh
+cargo add crudkit
+```
+Next, add SQLx:
+> Do not add a space after the comma between features, it will not work!
+```sh
+cargo add sqlx@0.8.3 --features postgres,runtime-tokio
+```
+Lastly, add Serde:
+```sh
+cargo add serde
+```
+
+At this point, you should be able to use CRUDkit in your crate. All other dependencies are
+re-exported from the crate so you do not have to worry about versions or features.
+
 ## Code of Conduct
 Please be aware that the maintainers and other developers of this project are people too, with their
 own lives, responsibilities, and circumstances. Just like in most open-source development, this is
