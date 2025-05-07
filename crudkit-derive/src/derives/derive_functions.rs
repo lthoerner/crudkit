@@ -325,6 +325,12 @@ pub fn derive_write_record(input: TokenStream2) -> SynResult<TokenStream2> {
                 database: &crudkit::database::PgDatabase,
                 update_params: Self::UpdateQueryParameters,
             ) -> Result<(), crudkit::error::Error> {
+                let relation_name = Self::Relation::get_qualified_name();
+                crudkit::log::debug!(
+                    "Dispatching single-UPDATE query to database, targeting relation
+                    {relation_name}"
+                );
+
                 let #update_params_type_name {
                     #(
                         #type_field_idents
@@ -346,6 +352,8 @@ pub fn derive_write_record(input: TokenStream2) -> SynResult<TokenStream2> {
                     column_bind_specifiers.join(", "),
                     where_clause,
                 );
+
+                crudkit::log::trace!("Raw query prior to variable binding: {query_string}");
 
                 use crudkit::traits::shared::Relation;
                 let mut query = sqlx::query(&query_string);

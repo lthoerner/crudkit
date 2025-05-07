@@ -50,6 +50,11 @@ pub trait Relation: Serialize + Sized + Send + Sync {
     /// Borrow the relation's records.
     fn records(&self) -> &[Self::Record];
 
+    /// Get the name of the relation, qualified by its schema namespace.
+    fn get_qualified_name() -> String {
+        format!("{}.{}", Self::SCHEMA_NAME, Self::RELATION_NAME)
+    }
+
     /// Pick a random record from the relation.
     ///
     /// This is used mostly for randomly generating foreign keys, but can be used elsewhere if

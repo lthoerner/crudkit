@@ -41,6 +41,7 @@ pub trait WriteRelation: Relation {
     ///
     /// This is the standard version of this method and should not be used as an Axum route handler.
     /// For the handler method, use [`WriteRelation::create_one_handler()`].
+    // * This method does not emit any logs because `SingleInsert::insert()` already emits logs.
     fn create_one(
         database: &PgDatabase,
         create_params: <Self::WriteRecord as WriteRecord>::CreateQueryParameters,
@@ -61,6 +62,12 @@ pub trait WriteRelation: Relation {
         Query(create_params): Query<<Self::WriteRecord as WriteRecord>::CreateQueryParameters>,
     ) -> impl Future<Output = StatusCode> + Send {
         async move {
+            let relation_name = Self::get_qualified_name();
+            log::debug!(
+                "Request received by single-CREATE endpoint for relation {relation_name}, calling
+                query dispatcher"
+            );
+
             match Self::create_one(state.get_database(), create_params).await {
                 Ok(_) => StatusCode::CREATED,
                 Err(e) => StatusCode::from(e),
@@ -80,6 +87,11 @@ pub trait WriteRelation: Relation {
         database: &PgDatabase,
         update_params: <Self::WriteRecord as WriteRecord>::UpdateQueryParameters,
     ) -> impl Future<Output = CrudkitResult<()>> + Send {
+        let relation_name = Self::get_qualified_name();
+        log::debug!(
+            "Dispatching single-UPDATE query to database, targeting relation {relation_name}"
+        );
+
         <Self::WriteRecord as WriteRecord>::update_one(database, update_params)
     }
 
@@ -96,6 +108,12 @@ pub trait WriteRelation: Relation {
         Query(update_params): Query<<Self::WriteRecord as WriteRecord>::UpdateQueryParameters>,
     ) -> impl Future<Output = StatusCode> + Send {
         async move {
+            let relation_name = Self::get_qualified_name();
+            log::debug!(
+                "Request received by single-UPDATE endpoint for relation {relation_name}, calling
+                query dispatcher"
+            );
+
             match Self::update_one(state.get_database(), update_params).await {
                 Ok(_) => StatusCode::OK,
                 Err(e) => StatusCode::from(e),
@@ -115,15 +133,23 @@ pub trait WriteRelation: Relation {
         id: I,
     ) -> impl Future<Output = CrudkitResult<()>> + Send {
         async move {
-            match sqlx::query(&format!(
+            let relation_name = Self::get_qualified_name();
+            let query_string = format!(
                 "DELETE FROM {}.{} WHERE {} = $1",
                 Self::SCHEMA_NAME,
                 Self::RELATION_NAME,
                 Self::PRIMARY_KEY,
-            ))
-            .bind(id.id() as i32)
-            .execute(&database.connection)
-            .await
+            );
+
+            log::debug!(
+                "Dispatching single-DELETE query to database, targeting relation {relation_name}"
+            );
+            log::trace!("Raw query: {query_string}");
+
+            match sqlx::query(&query_string)
+                .bind(id.id() as i32)
+                .execute(&database.connection)
+                .await
             {
                 Ok(_) => Ok(()),
                 Err(e) => Err(CrudkitError::from(e)),
@@ -143,6 +169,12 @@ pub trait WriteRelation: Relation {
         Query(id_param): Query<I>,
     ) -> impl Future<Output = StatusCode> + Send {
         async move {
+            let relation_name = Self::get_qualified_name();
+            log::debug!(
+                "Request received by single-DELETE endpoint for relation {relation_name}, calling
+                query dispatcher"
+            );
+
             match Self::delete_one(state.get_database(), id_param).await {
                 Ok(_) => StatusCode::OK,
                 Err(e) => StatusCode::from(e),
@@ -159,13 +191,17 @@ pub trait WriteRelation: Relation {
     /// For the handler method, use [`WriteRelation::delete_all_handler()`].
     fn delete_all(database: &PgDatabase) -> impl Future<Output = CrudkitResult<()>> + Send {
         async move {
-            match sqlx::query(&format!(
-                "DELETE FROM {}.{}",
-                Self::SCHEMA_NAME,
-                Self::RELATION_NAME,
-            ))
-            .execute(&database.connection)
-            .await
+            let relation_name = Self::get_qualified_name();
+            let query_string = format!("DELETE FROM {}.{}", Self::SCHEMA_NAME, Self::RELATION_NAME);
+
+            log::debug!(
+                "Dispatching multi-DELETE query to database, targeting relation {relation_name}"
+            );
+            log::trace!("Raw query: {query_string}");
+
+            match sqlx::query(&query_string)
+                .execute(&database.connection)
+                .await
             {
                 Ok(_) => Ok(()),
                 Err(e) => Err(CrudkitError::from(e)),
@@ -184,6 +220,12 @@ pub trait WriteRelation: Relation {
         state: State<Arc<S>>,
     ) -> impl Future<Output = StatusCode> + Send {
         async move {
+            let relation_name = Self::get_qualified_name();
+            log::debug!(
+                "Request received by multi-DELETE endpoint for relation {relation_name}, calling
+                query dispatcher"
+            );
+
             match Self::delete_all(state.get_database()).await {
                 Ok(_) => StatusCode::OK,
                 Err(e) => StatusCode::from(e),
@@ -270,11 +312,26 @@ pub trait SingleInsert: Record {
     /// implemented for any database table type.
     fn insert(self, database: &PgDatabase) -> impl Future<Output = CrudkitResult<()>> + Send {
         async move {
+            let relation_name = Self::Relation::get_qualified_name();
+            log::debug!(
+                "Dispatching single-INSERT query to database, targeting relation {relation_name}"
+            );
+
             let mut query_builder = Self::get_query_builder();
             query_builder.push_values(std::iter::once(self), Self::push_column_bindings);
+
+            let query_string = query_builder.sql();
+            log::trace!("Raw query: {query_string}");
+
             match query_builder.build().execute(&database.connection).await {
-                Ok(_) => Ok(()),
-                Err(e) => Err(CrudkitError::from(e)),
+                Ok(_) => {
+                    log::debug!("Data has been successfully inserted");
+                    Ok(())
+                }
+                Err(e) => {
+                    log::debug!("Failed to insert data to relation {relation_name}");
+                    Err(CrudkitError::from(e))
+                }
             }
         }
     }
@@ -315,13 +372,33 @@ pub trait BulkInsert: WriteRelation<Record: SingleInsert> {
     /// parameters (table column count * record count).
     fn insert_all(self, database: &PgDatabase) -> impl Future<Output = CrudkitResult<()>> + Send {
         async move {
-            for chunk in self.into_chunks() {
+            let relation_name = Self::get_qualified_name();
+            log::debug!(
+                "Dispatching multi-INSERT query to database, targeting relation {relation_name}"
+            );
+
+            let chunk_count = self.records().len() / Self::CHUNK_SIZE;
+            for (i, chunk) in self.into_chunks().enumerate() {
+                log::debug!("Inserting data chunk {i} of {chunk_count}");
+
                 let mut query_builder = Self::Record::get_query_builder();
                 query_builder.push_values(chunk, Self::Record::push_column_bindings);
+
+                let query_string = query_builder.sql();
+                log::trace!("Raw query: {query_string}");
+
                 if let Err(e) = query_builder.build().execute(&database.connection).await {
+                    log::error!(
+                        "Failed to insert data chunk {i} of {chunk_count} to relation 
+                        {relation_name}"
+                    );
                     return Err(CrudkitError::from(e));
                 }
+
+                log::debug!("Data chunk has been successfully inserted");
             }
+
+            log::debug!("All data chunks have been successfully inserted");
 
             Ok(())
         }

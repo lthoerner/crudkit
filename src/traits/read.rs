@@ -42,15 +42,23 @@ pub trait ReadRelation: Relation {
         id: I,
     ) -> impl Future<Output = CrudkitResult<Self::ReadRecord>> + Send {
         async move {
-            match sqlx::query_as(&format!(
+            let relation_name = Self::get_qualified_name();
+            let query_string = format!(
                 "SELECT * FROM {}.{} WHERE {} = $1",
                 Self::SCHEMA_NAME,
                 Self::RELATION_NAME,
                 Self::PRIMARY_KEY,
-            ))
-            .bind(id.id() as i32)
-            .fetch_one(&database.connection)
-            .await
+            );
+
+            log::debug!(
+                "Dispatching single-SELECT query to database, targeting relation {relation_name}"
+            );
+            log::trace!("Raw query prior to variable binding: {query_string}");
+
+            match sqlx::query_as(&query_string)
+                .bind(id.id() as i32)
+                .fetch_one(&database.connection)
+                .await
             {
                 Ok(record) => Ok(record),
                 Err(e) => Err(CrudkitError::from(e)),
@@ -69,6 +77,12 @@ pub trait ReadRelation: Relation {
         state: State<Arc<S>>,
         Query(id_param): Query<I>,
     ) -> impl Future<Output = Response> + Send {
+        let relation_name = Self::get_qualified_name();
+        log::debug!(
+            "Request received by single-SELECT endpoint for relation {relation_name}, calling query
+            dispatcher"
+        );
+
         async move {
             match Self::query_one(state.get_database(), id_param).await {
                 Ok(record) => Json(record).into_response(),
@@ -82,15 +96,23 @@ pub trait ReadRelation: Relation {
     /// This is the standard version of this method and should not be used as an Axum route handler.
     /// For the handler method, use [`ReadRelation::query_all_handler()`].
     fn query_all(database: &PgDatabase) -> impl Future<Output = CrudkitResult<Self>> + Send {
+        let relation_name = Self::get_qualified_name();
+        let query_string = format!(
+            "SELECT * FROM {}.{} ORDER BY {}",
+            Self::SCHEMA_NAME,
+            Self::RELATION_NAME,
+            Self::PRIMARY_KEY,
+        );
+
+        log::debug!(
+            "Dispatching multi-SELECT query to database, targeting relation {relation_name}"
+        );
+        log::trace!("Raw query prior to variable binding: {query_string}");
+
         async move {
-            match sqlx::query_as(&format!(
-                "SELECT * FROM {}.{} ORDER BY {}",
-                Self::SCHEMA_NAME,
-                Self::RELATION_NAME,
-                Self::PRIMARY_KEY,
-            ))
-            .fetch_all(&database.connection)
-            .await
+            match sqlx::query_as(&query_string)
+                .fetch_all(&database.connection)
+                .await
             {
                 Ok(records) => Ok(Self::with_records(records)),
                 Err(e) => Err(CrudkitError::from(e)),
@@ -105,6 +127,12 @@ pub trait ReadRelation: Relation {
     fn query_all_handler<S: DatabaseState>(
         state: State<Arc<S>>,
     ) -> impl Future<Output = Response> + Send {
+        let relation_name = Self::get_qualified_name();
+        log::debug!(
+            "Request received by multi-SELECT endpoint for relation {relation_name}, calling query
+            dispatcher"
+        );
+
         async move {
             match Self::query_all(state.get_database()).await {
                 Ok(records) => Json(records).into_response(),
