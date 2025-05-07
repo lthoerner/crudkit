@@ -1,5 +1,5 @@
-// TODO: creating a module like this is a little messy, refactor this to
-// something better in the future.
+// TODO: creating a module like this is a little messy, refactor this to something better in the
+// future.
 #[path = "./database_connection.rs"]
 mod database_connection;
 
