@@ -5,15 +5,7 @@ mod database_connection;
 
 use serde::Serialize;
 
-use crudkit::{
-    traits::{
-        id_parameter::{GenericIdParameter, IdParameter},
-        read::ReadRelation,
-        write::{BulkInsert, SingleInsert, WriteRelation},
-    },
-    BulkInsert, IdentifiableRecord, ReadRecord, ReadRelation, Record, Relation, SingleInsert,
-    WriteRecord, WriteRelation,
-};
+use crudkit::prelude::*;
 use database_connection::get_database;
 use serial_test::serial;
 
